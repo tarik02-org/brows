@@ -1,15 +1,131 @@
-use objc2::rc::Retained;
-use objc2::{AnyThread, MainThreadMarker};
+use objc2::rc::{Retained, autoreleasepool};
+use objc2::runtime::{AnyClass, AnyObject, ClassBuilder, NSObject, Sel};
+use objc2::{AnyThread, ClassType, MainThreadMarker, class, msg_send, sel};
 use std::collections::HashSet;
+use std::ffi::CStr;
 use std::ops::Deref;
 use std::path::PathBuf;
+use std::sync::OnceLock;
+use std::sync::mpsc::Sender;
 
 use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSEvent, NSScreen, NSWorkspace};
 use objc2_foundation::{
     NSArray, NSBundle, NSDictionary, NSNumber, NSPoint, NSRect, NSSearchPathDirectory,
     NSSearchPathDomainMask, NSSearchPathForDirectoriesInDomains, NSSize, NSString,
 };
-use tracing::debug;
+use tracing::{debug, warn};
+
+use crate::MessageToMain;
+
+/// Receives the get-URL Apple Events that open links with brows and forwards each link with
+/// the bundle id of the app that sent it. Rune's `on_open_url` hook runs after the event is
+/// dispatched, when the sender can no longer be read. Install it on the main thread before the
+/// event loop starts, so the link that launched brows arrives here too; Rune leaves a handler
+/// installed before its loop alone.
+pub fn install_open_url_handler(main_sender: Sender<MessageToMain>) {
+    const NAME: &CStr = c"BrowsOpenUrlHandler";
+
+    if MainThreadMarker::new().is_none() {
+        warn!("Could not install the open-URL handler off the main thread");
+        return;
+    }
+    if OPEN_URL_SENDER.set(main_sender).is_err() {
+        return;
+    }
+
+    let class = AnyClass::get(NAME).or_else(|| {
+        let mut builder = ClassBuilder::new(NAME, NSObject::class())?;
+        // SAFETY: `handle_get_url_event` matches `handleGetURLEvent:withReplyEvent:`.
+        unsafe {
+            builder.add_method(
+                sel!(handleGetURLEvent:withReplyEvent:),
+                handle_get_url_event as extern "C" fn(_, _, _, _),
+            );
+        }
+        Some(builder.register())
+    });
+    let Some(class) = class else {
+        warn!("Could not register {NAME:?}");
+        return;
+    };
+
+    // SAFETY: Foundation calls on the main thread. The event manager doesn't retain its
+    // handler, so the handler is never released.
+    unsafe {
+        let handler: *mut AnyObject = msg_send![class, new];
+        let manager: *mut AnyObject =
+            msg_send![class!(NSAppleEventManager), sharedAppleEventManager];
+        let Some(manager) = manager.as_ref() else {
+            warn!("Could not reach NSAppleEventManager");
+            return;
+        };
+        let _: () = msg_send![
+            manager,
+            setEventHandler: handler,
+            andSelector: sel!(handleGetURLEvent:withReplyEvent:),
+            forEventClass: GET_URL_EVENT,
+            andEventID: GET_URL_EVENT
+        ];
+    }
+}
+
+/// `'GURL'`: `kInternetEventClass` and `kAEGetURL`.
+const GET_URL_EVENT: u32 = u32::from_be_bytes(*b"GURL");
+
+static OPEN_URL_SENDER: OnceLock<Sender<MessageToMain>> = OnceLock::new();
+
+extern "C" fn handle_get_url_event(
+    _: &AnyObject,
+    _: Sel,
+    event: *mut AnyObject,
+    _reply: *mut AnyObject,
+) {
+    let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        // SAFETY: AppKit passes the event being dispatched, or nil.
+        let Some(event) = (unsafe { event.as_ref() }) else {
+            return;
+        };
+        let Some(url) = apple_event_url(event) else {
+            warn!("Received a get-URL event without a URL");
+            return;
+        };
+        let source_bundle_id = apple_event_sender_bundle_id(event).unwrap_or_default();
+        if let Some(sender) = OPEN_URL_SENDER.get() {
+            sender
+                .send(MessageToMain::UrlOpenRequest(source_bundle_id, url, None))
+                .ok();
+        }
+    }));
+    if caught.is_err() {
+        warn!("Open-URL handler panicked");
+    }
+}
+
+fn apple_event_url(event: &AnyObject) -> Option<String> {
+    const DIRECT_OBJECT: u32 = u32::from_be_bytes(*b"----");
+
+    // SAFETY: `event` is an NSAppleEventDescriptor; both messages are nil-safe.
+    autoreleasepool(|_| unsafe {
+        let param: *mut AnyObject = msg_send![event, paramDescriptorForKeyword: DIRECT_OBJECT];
+        let url: *mut NSString = msg_send![param.as_ref()?, stringValue];
+        Some(url.as_ref()?.to_string())
+    })
+}
+
+fn apple_event_sender_bundle_id(event: &AnyObject) -> Option<String> {
+    const KEY_ADDRESS_ATTR: u32 = u32::from_be_bytes(*b"addr");
+    const TYPE_APPLICATION_BUNDLE_ID: u32 = u32::from_be_bytes(*b"bund");
+
+    // SAFETY: `event` is an NSAppleEventDescriptor; every message is nil-safe.
+    autoreleasepool(|_| unsafe {
+        let sender: *mut AnyObject =
+            msg_send![event, attributeDescriptorForKeyword: KEY_ADDRESS_ATTR];
+        let bundle_id: *mut AnyObject =
+            msg_send![sender.as_ref()?, coerceToDescriptorType: TYPE_APPLICATION_BUNDLE_ID];
+        let bundle_id: *mut NSString = msg_send![bundle_id.as_ref()?, stringValue];
+        Some(bundle_id.as_ref()?.to_string()).filter(|bundle_id| !bundle_id.is_empty())
+    })
+}
 
 pub fn create_icon_for_app(full_path: &NSString, icon_path: &str) {
     unsafe {

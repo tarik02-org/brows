@@ -188,17 +188,15 @@ impl Picker {
                 self.state.ui_settings.behavioral_settings.unwrap_urls = behavior.unwrap_urls;
             }
             MessageToUi::UrlOpened {
-                source_bundle_id,
                 url,
                 activation_token,
             } => {
-                self.state.set_url(url.clone());
+                self.state.set_url(url);
                 self.state.incognito_mode = false;
                 self.menu = None;
                 if self.persistent {
                     self.show_at_cursor(activation_token);
                 }
-                self.send(MessageToMain::LinkOpenedFromBundle(source_bundle_id, url));
             }
             MessageToUi::BrowsersUpdated(browsers) => {
                 self.state.browsers = Arc::new(browsers);

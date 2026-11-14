@@ -8,7 +8,6 @@ use super::model::UIState;
 use super::picker::{self, PICKER_WIDTH, Picker, picker_height};
 use super::placement;
 use super::settings::AuxWindows;
-use crate::utils::BehavioralConfig;
 use crate::{MessageToMain, MessageToUi};
 
 const APP_ID: &str = "me.tarik02.brows";
@@ -39,16 +38,19 @@ pub fn run(
     let mut app = App::new(spec)
         .fit_content_height()
         .on_focus(Picker::on_focus)
-        .on_modifiers(Picker::on_modifiers)
-        .on_open_url(|s: &mut Picker, url, _| {
-            s.send(MessageToMain::UrlPassedToMain(
+        .on_modifiers(Picker::on_modifiers);
+    #[cfg(target_os = "macos")]
+    crate::macos::macos_native::install_open_url_handler(main_sender.clone());
+    #[cfg(not(target_os = "macos"))]
+    {
+        app = app.on_open_url(|s: &mut Picker, url, _| {
+            s.send(MessageToMain::UrlOpenRequest(
                 String::new(),
                 url.to_string(),
-                BehavioralConfig {
-                    unwrap_urls: s.state.ui_settings.behavioral_settings.unwrap_urls,
-                },
+                None,
             ));
         });
+    }
 
     app = if persistent {
         app.windowless()
