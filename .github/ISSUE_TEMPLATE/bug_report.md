@@ -11,4 +11,4 @@ A clear and concise description of what the bug is.
 
 **System:**
  - OS: [e.g. Ubuntu 23.10 with Gnome]
- - Browsers Version [e.g. 0.22.1] `⋮` -> About
+ - brows Version [e.g. 2026.8.1400] `⋮` -> About

@@ -7,13 +7,13 @@
 
         <!--  https://chromium.googlesource.com/chromium/src/+/lkgr/chrome/app/app-Info.plist -->
         <key>CFBundleExecutable</key>
-        <string>Browsers</string>
+        <string>brows</string>
 
         <key>CFBundleIdentifier</key>
-        <string>software.Browsers</string>
+        <string>me.tarik02.brows</string>
 
         <key>CFBundleIconFile</key>
-        <string>Browsers.icns</string>
+        <string>brows.icns</string>
 
         <key>CFBundlePackageType</key>
         <string>APPL</string>
@@ -59,10 +59,10 @@
         <string>6.0</string>
 
         <key>CFBundleName</key>
-        <string>Browsers</string>
+        <string>brows</string>
 
         <key>CFBundleDisplayName</key>
-        <string>Browsers</string>
+        <string>brows</string>
 
         <key>CFBundlePackageType</key>
         <string>APPL</string>

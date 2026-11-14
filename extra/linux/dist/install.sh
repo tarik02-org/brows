@@ -49,19 +49,19 @@ else
 fi
 create_dir_if_not_exists "$INSTALL_DIR"
 
-TARGET_INSTALL_BINARY_PATH="$INSTALL_DIR/browsers"
+TARGET_INSTALL_BINARY_PATH="$INSTALL_DIR/brows"
 
 # Use XDG_DATA_HOME or default to $HOME/.local/share if it's missing
 XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 create_dir_if_not_exists "$XDG_DATA_HOME"
 
 if [ "$IS_LOCAL_INSTALL" = true ]; then
-  # ~/.local/share/software.Browsers
-  TARGET_DATA_DIR="$XDG_DATA_HOME/software.Browsers"
+  # ~/.local/share/me.tarik02.brows
+  TARGET_DATA_DIR="$XDG_DATA_HOME/me.tarik02.brows"
 else
   # /usr/local/share is for files not managed by package manager
   # (otherwise should use /usr/share if using package manager)
-  TARGET_DATA_DIR="/usr/local/share/software.Browsers"
+  TARGET_DATA_DIR="/usr/local/share/me.tarik02.brows"
 fi
 
 # Holds binary, icon, translations
@@ -75,8 +75,8 @@ create_dir_if_not_exists "$TARGET_RESOURCES_DIR" true
 TARGET_BINARY_DIR="$TARGET_DATA_DIR/bin"
 create_dir_if_not_exists "$TARGET_BINARY_DIR" true
 
-# $HOME/.local/share/software.Browsers/bin/browsers
-TARGET_BINARY_PATH="$TARGET_BINARY_DIR/browsers"
+# $HOME/.local/share/me.tarik02.brows/bin/brows
+TARGET_BINARY_PATH="$TARGET_BINARY_DIR/brows"
 
 TARGET_ICONS_DIR="$TARGET_RESOURCES_DIR/icons"
 create_dir_if_not_exists "$TARGET_ICONS_DIR" true
@@ -86,7 +86,7 @@ TARGET_ICONS_512_DIR="$TARGET_ICONS_DIR/512x512"
 create_dir_if_not_exists "$TARGET_ICONS_512_DIR" true
 
 SRC_ICONS_DIR="$THIS_DIR/resources/icons"
-cp "$SRC_ICONS_DIR/512x512/software.Browsers.png" "$TARGET_ICONS_DIR/512x512/software.Browsers.png"
+cp "$SRC_ICONS_DIR/512x512/me.tarik02.brows.png" "$TARGET_ICONS_DIR/512x512/me.tarik02.brows.png"
 
 TARGET_I18N_DIR="$TARGET_RESOURCES_DIR/i18n"
 create_dir_if_not_exists "$TARGET_I18N_DIR" true
@@ -105,7 +105,7 @@ cp "$SRC_REPOSITORY_DIR/application-repository.toml" "$TARGET_REPOSITORY_DIR/app
 # armv7l, aarch64, x86_64
 ARCH="$(uname -m)"
 
-SRC_BINARY_PATH="$THIS_DIR/$ARCH/browsers"
+SRC_BINARY_PATH="$THIS_DIR/$ARCH/brows"
 if [ ! -f "$SRC_BINARY_PATH" ]; then
   echo "$SRC_BINARY_PATH does not exist. Please install manually"
   exit 1
@@ -118,24 +118,24 @@ if [ "$IS_LOCAL_INSTALL" = true ]; then
 else
   SRC_DESKTOP_FILE_DIR="$THIS_DIR/share/system/applications"
 fi
-SRC_DESKTOP_FILE_PATH="$SRC_DESKTOP_FILE_DIR/software.Browsers.desktop"
+SRC_DESKTOP_FILE_PATH="$SRC_DESKTOP_FILE_DIR/me.tarik02.brows.desktop"
 
 if [ "$IS_LOCAL_INSTALL" = true ]; then
   SRC_DBUS_SERVICE_DIR="$THIS_DIR/share/user/dbus-1/services"
 else
   SRC_DBUS_SERVICE_DIR="$THIS_DIR/share/system/dbus-1/services"
 fi
-SRC_DBUS_SERVICE_PATH="$SRC_DBUS_SERVICE_DIR/software.Browsers.service"
+SRC_DBUS_SERVICE_PATH="$SRC_DBUS_SERVICE_DIR/me.tarik02.brows.service"
 
 if [ "$IS_LOCAL_INSTALL" = true ]; then
   SRC_XFCE4_DESKTOP_FILE_DIR="$THIS_DIR/share/user/xfce4/helpers"
 else
   SRC_XFCE4_DESKTOP_FILE_DIR="$THIS_DIR/share/system/xfce4/helpers"
 fi
-SRC_XFCE4_DESKTOP_FILE_PATH="$SRC_XFCE4_DESKTOP_FILE_DIR/software.Browsers.desktop"
+SRC_XFCE4_DESKTOP_FILE_PATH="$SRC_XFCE4_DESKTOP_FILE_DIR/me.tarik02.brows.desktop"
 
 prepare_desktop_file() {
-  SRC_TEMPLATE_DESKTOP_FILE_PATH="$THIS_DIR/template/share/applications/software.Browsers.template.desktop"
+  SRC_TEMPLATE_DESKTOP_FILE_PATH="$THIS_DIR/template/share/applications/me.tarik02.brows.template.desktop"
   if [ ! -f "$SRC_TEMPLATE_DESKTOP_FILE_PATH" ]; then
     echo "$SRC_TEMPLATE_DESKTOP_FILE_PATH does not exist. Please install manually"
     exit 1
@@ -146,7 +146,7 @@ prepare_desktop_file() {
 }
 
 prepare_dbus_service() {
-  SRC_TEMPLATE_DBUS_SERVICE_PATH="$THIS_DIR/template/share/dbus-1/services/software.Browsers.service"
+  SRC_TEMPLATE_DBUS_SERVICE_PATH="$THIS_DIR/template/share/dbus-1/services/me.tarik02.brows.service"
   if [ ! -f "$SRC_TEMPLATE_DBUS_SERVICE_PATH" ]; then
     echo "$SRC_TEMPLATE_DBUS_SERVICE_PATH does not exist. Please install manually"
     exit 1
@@ -157,21 +157,21 @@ prepare_dbus_service() {
 }
 
 prepare_xfce4_desktop_file() {
-  SRC_TEMPLATE_XFCE4_DESKTOP_FILE_PATH="$THIS_DIR/template/share/xfce4/helpers/software.Browsers.template.desktop"
+  SRC_TEMPLATE_XFCE4_DESKTOP_FILE_PATH="$THIS_DIR/template/share/xfce4/helpers/me.tarik02.brows.template.desktop"
   if [ ! -f "$SRC_TEMPLATE_XFCE4_DESKTOP_FILE_PATH" ]; then
     echo "$SRC_TEMPLATE_XFCE4_DESKTOP_FILE_PATH does not exist. Please install manually"
     exit 1
   fi
 
   create_dir_if_not_exists "$SRC_XFCE4_DESKTOP_FILE_DIR" true
-  sed "s|€XFCEBinaries€|browsers;$TARGET_INSTALL_BINARY_PATH;|g" "$SRC_TEMPLATE_XFCE4_DESKTOP_FILE_PATH" >"$SRC_XFCE4_DESKTOP_FILE_PATH"
+  sed "s|€XFCEBinaries€|brows;$TARGET_INSTALL_BINARY_PATH;|g" "$SRC_TEMPLATE_XFCE4_DESKTOP_FILE_PATH" >"$SRC_XFCE4_DESKTOP_FILE_PATH"
 }
 
 install_binary() {
-  # $HOME/.local/share/software.Browsers/bin/browsers
+  # $HOME/.local/share/me.tarik02.brows/bin/brows
   cp "$SRC_BINARY_PATH" "$TARGET_BINARY_PATH"
 
-  # Symlink binary to $HOME/.local/bin/browsers or /usr/local/bin/browsers
+  # Symlink binary to $HOME/.local/bin/brows or /usr/local/bin/brows
   ln -sf "$TARGET_BINARY_PATH" "$TARGET_INSTALL_BINARY_PATH"
 }
 
@@ -195,7 +195,7 @@ install_dbus_service() {
   fi
   create_dir_if_not_exists "$TARGET_DBUS_SERVICE_DIR"
 
-  install -m 0644 "$SRC_DBUS_SERVICE_PATH" "$TARGET_DBUS_SERVICE_DIR/software.Browsers.service"
+  install -m 0644 "$SRC_DBUS_SERVICE_PATH" "$TARGET_DBUS_SERVICE_DIR/me.tarik02.brows.service"
 }
 
 install_xfce4_desktop_file() {
@@ -207,23 +207,23 @@ install_xfce4_desktop_file() {
   fi
   create_dir_if_not_exists "$TARGET_XFCE4_HELPERS_DIR"
 
-  TARGET_XFCE4_DESKTOP_FILE_PATH="$TARGET_XFCE4_HELPERS_DIR/software.Browsers.desktop"
+  TARGET_XFCE4_DESKTOP_FILE_PATH="$TARGET_XFCE4_HELPERS_DIR/me.tarik02.brows.desktop"
 
-  # XFCE4 .desktop file adds Browsers as an option in Default Browsers select list
-  # ~/.local/share/xfce4/helpers/software.Browsers.desktop
+  # XFCE4 .desktop file adds brows as an option in Default Browsers select list
+  # ~/.local/share/xfce4/helpers/me.tarik02.brows.desktop
   cp "$SRC_XFCE4_DESKTOP_FILE_PATH" "$TARGET_XFCE4_DESKTOP_FILE_PATH"
 }
 
 install_icons() {
-  # Installs to ~/.local/share/icons/hicolor/512x512/apps/software.Browsers.png
-  #          or /usr/share/icons/hicolor/512x512/apps/software.Browsers.png
+  # Installs to ~/.local/share/icons/hicolor/512x512/apps/me.tarik02.brows.png
+  #          or /usr/share/icons/hicolor/512x512/apps/me.tarik02.brows.png
   # --mode user|system
   # The default is to use system mode when called by root and to use user mode
   # when called by a non-root user.
   # Could also consider symlinking from application directory
   # (but we don't need all those icons for the app itself)
   for size in 16 32 64 128 256 512; do
-    xdg-icon-resource install --novendor --size ${size} "$SRC_ICONS_DIR/${size}x${size}/software.Browsers.png"
+    xdg-icon-resource install --novendor --size ${size} "$SRC_ICONS_DIR/${size}x${size}/me.tarik02.brows.png"
   done
 }
 
@@ -241,9 +241,9 @@ if [[ $* != *--skip-desktop-database* ]]; then
   # Refresh desktop database
   update-desktop-database "$TARGET_DESKTOP_DIR_PATH"
 
-  # Sets Browsers as default application for https and http mimetypes
-  xdg-mime default "software.Browsers.desktop" x-scheme-handler/https x-scheme-handler/http || echo "Could not make Browsers as default web link opener"
+  # Sets brows as default application for https and http mimetypes
+  xdg-mime default "me.tarik02.brows.desktop" x-scheme-handler/https x-scheme-handler/http || echo "Could not make brows as default web link opener"
 fi
 
-echo "Browsers has been installed. Enjoy!"
-echo "Please report any issues at https://github.com/tarik02-org/browsers-gpui/issues"
+echo "brows has been installed. Enjoy!"
+echo "Please report any issues at https://github.com/tarik02-org/brows/issues"

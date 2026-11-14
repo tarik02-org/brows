@@ -1,4 +1,7 @@
+use std::fs;
 use std::path::PathBuf;
+
+use tracing::{info, warn};
 
 #[cfg(target_os = "linux")]
 use crate::linux::linux_utils;
@@ -37,6 +40,52 @@ pub fn get_repository_toml_path() -> PathBuf {
 
 pub fn get_config_json_path() -> PathBuf {
     return get_config_root_dir().join("config.json");
+}
+
+/// Copies config.json from the pre-rename `software.Browsers` config directory,
+/// unless brows already has its own config. The old directory is left untouched.
+pub fn migrate_legacy_config() {
+    let config_json_path = get_config_json_path();
+    if config_json_path.exists() {
+        return;
+    }
+
+    let legacy_config_json_path = get_legacy_config_root_dir().join("config.json");
+    if !legacy_config_json_path.is_file() {
+        return;
+    }
+
+    if let Err(error) = fs::create_dir_all(get_config_root_dir()) {
+        warn!(
+            "Could not create config directory for migrating {}: {error}",
+            legacy_config_json_path.display()
+        );
+        return;
+    }
+
+    match fs::copy(&legacy_config_json_path, &config_json_path) {
+        Ok(_) => info!(
+            "Migrated config from {} to {}",
+            legacy_config_json_path.display(),
+            config_json_path.display()
+        ),
+        Err(error) => warn!(
+            "Could not migrate config from {} to {}: {error}",
+            legacy_config_json_path.display(),
+            config_json_path.display()
+        ),
+    }
+}
+
+fn get_legacy_config_root_dir() -> PathBuf {
+    #[cfg(target_os = "macos")]
+    return macos_utils::get_legacy_app_config_root_dir();
+
+    #[cfg(target_os = "linux")]
+    return linux_utils::get_legacy_app_config_root_dir();
+
+    #[cfg(target_os = "windows")]
+    return windows_utils::get_legacy_app_config_root_dir();
 }
 
 pub fn get_config_root_dir() -> PathBuf {
@@ -120,7 +169,7 @@ pub fn get_snap_root() -> PathBuf {
 }
 
 pub fn get_app_icon_path() -> PathBuf {
-    return get_resources_basedir().join("icons/512x512/software.Browsers.png");
+    return get_resources_basedir().join("icons/512x512/me.tarik02.brows.png");
 }
 
 // This is the {base_dir} of the path {base_dir}/{locale}/{resource},
@@ -135,15 +184,15 @@ pub fn get_repository_basedir() -> PathBuf {
 
 pub fn get_resources_basedir() -> PathBuf {
     #[cfg(debug_assertions)]
-    // if running Browsers in debug mode
+    // if running brows in debug mode
     return PathBuf::from("./resources");
 
     #[cfg(target_os = "macos")]
-    // /Applications/Browsers.app/Contents/Resources/
+    // /Applications/brows.app/Contents/Resources/
     return macos_utils::get_this_app_resources_dir();
 
     #[cfg(target_os = "linux")]
-    // $HOME/.local/share/software.Browsers/resources
+    // $HOME/.local/share/me.tarik02.brows/resources
     return linux_utils::get_this_app_resources_dir();
 
     #[cfg(target_os = "windows")]

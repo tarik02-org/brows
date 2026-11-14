@@ -5,3 +5,4 @@ pub mod model;
 mod picker;
 mod placement;
 mod settings;
+mod style;

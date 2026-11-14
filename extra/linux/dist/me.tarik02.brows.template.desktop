@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
 Terminal=false
-Name=Browsers
+Name=brows
 Comment=Open the right browser at the right time
-Icon=software.Browsers
+Icon=me.tarik02.brows
 Categories=Network;WebBrowser;
 MimeType=x-scheme-handler/http;x-scheme-handler/https;
 DBusActivatable=true

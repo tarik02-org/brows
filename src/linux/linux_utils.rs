@@ -12,7 +12,9 @@ use freedesktop_icons;
 
 use crate::{InstalledBrowser, SupportedAppRepository};
 
-const XDG_NAME: &'static str = "software.Browsers";
+const XDG_NAME: &'static str = "me.tarik02.brows";
+// XDG directory name used before the rename to brows.
+const LEGACY_XDG_NAME: &'static str = "software.Browsers";
 
 #[derive(Clone)]
 struct DesktopEntryHolder {
@@ -182,7 +184,7 @@ impl OsHelper {
         restricted_domains: Vec<String>,
     ) -> Option<InstalledBrowser> {
         let id = desktop_entry_holder.app_id.as_str();
-        if id == "software.Browsers" {
+        if id == "me.tarik02.brows" {
             // this is us, skip
             return None;
         }
@@ -335,42 +337,47 @@ fn find_icon_path_from_desktop_icon_value(icon_str: &str) -> Option<PathBuf> {
     };
 }
 
-// $HOME/.config/software.Browsers
+// $HOME/.config/me.tarik02.brows
 pub fn get_this_app_config_root_dir() -> PathBuf {
     return get_this_app_xdg_config_dir();
 }
 
-// $HOME/.local/share/software.Browsers/resources
-// or /usr/local/share/software.Browsers/resources
+// $HOME/.config/software.Browsers
+pub fn get_legacy_app_config_root_dir() -> PathBuf {
+    return dirs::config_dir().unwrap().join(LEGACY_XDG_NAME);
+}
+
+// $HOME/.local/share/me.tarik02.brows/resources
+// or /usr/local/share/me.tarik02.brows/resources
 pub fn get_this_app_resources_dir() -> PathBuf {
     return get_this_app_data_dir().join("resources");
 }
 
-// $HOME/.local/share/software.Browsers
-// $XDG_DATA_HOME/software.Browsers
-// /usr/local/share/software.Browsers
-// /usr/share/software.Browsers
+// $HOME/.local/share/me.tarik02.brows
+// $XDG_DATA_HOME/me.tarik02.brows
+// /usr/local/share/me.tarik02.brows
+// /usr/share/me.tarik02.brows
 fn get_this_app_data_dir() -> PathBuf {
-    //   # ~/.local/share/software.Browsers/bin/browsers
-    //   $XDG_DATA_HOME/software.Browsers/bin/browsers
-    //   /usr/local/share/software.Browsers/bin/browsers
+    //   # ~/.local/share/me.tarik02.brows/bin/brows
+    //   $XDG_DATA_HOME/me.tarik02.brows/bin/brows
+    //   /usr/local/share/me.tarik02.brows/bin/brows
     let binary_file_path =
         fs::canonicalize(std::env::current_exe().expect("Can't find current executable"))
             .expect("Can't canonicalize current executable path");
 
-    //   # ~/.local/share/software.Browsers/bin/
-    //   $XDG_DATA_HOME/software.Browsers/bin/
-    //   /usr/local/share/software.Browsers/bin/
+    //   # ~/.local/share/me.tarik02.brows/bin/
+    //   $XDG_DATA_HOME/me.tarik02.brows/bin/
+    //   /usr/local/share/me.tarik02.brows/bin/
     let binary_dir_path = binary_file_path.parent().unwrap();
 
-    //   # ~/.local/share/software.Browsers/
-    //   $XDG_DATA_HOME/software.Browsers/
-    //   /usr/local/share/software.Browsers/
+    //   # ~/.local/share/me.tarik02.brows/
+    //   $XDG_DATA_HOME/me.tarik02.brows/
+    //   /usr/local/share/me.tarik02.brows/
     let data_dir_path = binary_dir_path.parent().unwrap();
     return data_dir_path.to_path_buf();
 }
 
-// /run/user/1001/software.Browsers/
+// /run/user/1001/me.tarik02.brows/
 pub fn get_this_app_runtime_dir() -> PathBuf {
     // Either $XDG_RUNTIME_DIR (/run/user/1001/)
     // or $XDG_CACHE_HOME
@@ -381,30 +388,30 @@ pub fn get_this_app_runtime_dir() -> PathBuf {
         .join(XDG_NAME)
 }
 
-// $HOME/.config/software.Browsers
+// $HOME/.config/me.tarik02.brows
 fn get_this_app_xdg_config_dir() -> PathBuf {
     // $XDG_CONFIG_HOME or $HOME/.config
     return dirs::config_dir().unwrap().join(XDG_NAME);
 }
 
-// $HOME/.local/share/software.Browsers
+// $HOME/.local/share/me.tarik02.brows
 fn get_this_app_xdg_data_dir() -> PathBuf {
     // $XDG_DATA_HOME or $HOME/.local/share
     return dirs::data_dir().unwrap().join(XDG_NAME);
 }
 
-// $HOME/.cache/software.Browsers
+// $HOME/.cache/me.tarik02.brows
 pub fn get_this_app_cache_root_dir() -> PathBuf {
     // $XDG_CACHE_HOME or $HOME/.cache
     return dirs::cache_dir().unwrap().join(XDG_NAME);
 }
 
-// $HOME/.local/state/software.Browsers/logs
+// $HOME/.local/state/me.tarik02.brows/logs
 pub fn get_this_app_logs_root_dir() -> PathBuf {
     return get_this_app_xdg_state_dir().join("logs");
 }
 
-// $HOME/.local/state/software.Browsers
+// $HOME/.local/state/me.tarik02.brows
 fn get_this_app_xdg_state_dir() -> PathBuf {
     // $XDG_STATE_HOME or $HOME/.local/state
     let state_dir = dirs::state_dir().unwrap();
@@ -413,12 +420,12 @@ fn get_this_app_xdg_state_dir() -> PathBuf {
 
 // $HOME/.config
 pub fn linux_get_unsandboxed_config_dir() -> PathBuf {
-    // TODO: escape sandbox if Browsers is running in snap/flatpak
+    // TODO: escape sandbox if brows is running in snap/flatpak
     return dirs::config_dir().unwrap();
 }
 
 pub fn get_snap_root_dir() -> PathBuf {
-    // TODO: escape sandbox if Browsers is running in snap/flatpak
+    // TODO: escape sandbox if brows is running in snap/flatpak
     let home_dir = dirs::home_dir().unwrap();
     let buf1 = home_dir.join("snap");
     return buf1;
@@ -447,7 +454,7 @@ pub fn set_default_web_browser() -> bool {
         .status();
 
     if result.is_err() {
-        warn!("Could not set Browsers as default app");
+        warn!("Could not set brows as default app");
     }
 
     return false;

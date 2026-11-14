@@ -773,8 +773,8 @@ pub fn handle_messages_to_main(
                     // workaround for weird bug where Safari opens default browser on hard launch
                     // see https://github.com/Browsers-software/browsers/issues/79
                     // We might need to remove this workaround if we want to allow Safari
-                    // to open Browsers via some extension
-                    info!("Safari has a weird bug and launched Browsers. Exiting Browsers.",);
+                    // to open brows via some extension
+                    info!("Safari has a weird bug and launched brows. Exiting brows.",);
                     exit(0x0100);
                 }
                 debug!("url: {}", url);
@@ -944,8 +944,8 @@ pub fn handle_messages_to_main(
                 app_finder.save_config(&config);
 
                 // refresh opening rules immediately
-                // so that if same Browsers instance stays open,
-                // it will already work with the new rule without restarting Browsers
+                // so that if same brows instance stays open,
+                // it will already work with the new rule without restarting brows
                 opening_rules_and_default_profile.opening_rules = to_opening_rules(&new_rules);
             }
             MessageToMain::SaveConfigDefaultOpener(default_opener) => {
@@ -960,8 +960,8 @@ pub fn handle_messages_to_main(
                 app_finder.save_config(&config);
 
                 // refresh default opener immediately
-                // so that if same Browsers instance stays open,
-                // it will already work with the new rule without restarting Browsers
+                // so that if same brows instance stays open,
+                // it will already work with the new rule without restarting brows
                 opening_rules_and_default_profile.default_profile = new_default_profile.clone();
             }
             MessageToMain::SaveConfigUISettings(settings) => {

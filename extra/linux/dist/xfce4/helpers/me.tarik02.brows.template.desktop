@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
-Icon=software.Browsers
-Name=Browsers
+Icon=me.tarik02.brows
+Name=brows
 Type=X-XFCE-Helper
 StartupNotify=false
 NoDisplay=true

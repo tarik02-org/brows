@@ -2,17 +2,17 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::mpsc::Sender;
 
-use rune::tok::{self, type_};
 use rune::{
-    AppHandle, Color, Cx, El, Image, ImageCache, Key, KeyEvent, Mods, PhysicalKeyCode, PopupItem,
-    PopupMenu, PointerPress, Tx, Waker, col, el, row, text,
+    AppHandle, Color, Cx, El, Image, ImageCache, Key, KeyEvent, Mods, PhysicalKeyCode,
+    PointerPress, PopupItem, PopupMenu, Tx, Waker, col, el, popup_menu_supported, row, text,
 };
+use rune_kit::{Button, ButtonVariant, ControlSize, Keybind, Kit, Menu, MenuItem, context_menu};
 use tracing::{info, warn};
 
 use super::model::{UIBrowser, UIState, get_filtered_browsers};
 use super::placement;
 use super::settings::AuxWindows;
-use crate::utils::ConfiguredTheme;
+use super::style;
 use crate::{MessageToMain, MessageToUi, MoveTo};
 
 pub(super) const PICKER_WIDTH: f32 = 296.0;
@@ -21,6 +21,10 @@ const FOOTER_HEIGHT: f32 = 30.0;
 const PADDING: f32 = 4.0;
 const ICON_SIZE: f32 = 24.0;
 const PROFILE_ICON_SIZE: f32 = 12.0;
+const MENU_WIDTH: f32 = 220.0;
+const MENU_ROW_HEIGHT: f32 = 30.0;
+const MENU_SEPARATOR_HEIGHT: f32 = 9.0;
+const MENU_PADDING: f32 = 16.0;
 
 pub(super) struct Picker {
     pub(super) state: UIState,
@@ -29,7 +33,32 @@ pub(super) struct Picker {
     me: AppHandle<Picker>,
     pub(super) aux: AuxWindows,
     icons: Option<Icons>,
-    menu_open: bool,
+    menu: Option<OpenMenu>,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum MenuKind {
+    Options,
+    Browser(usize),
+}
+
+/// A menu being shown, natively or (where the platform has no native pop-up menus) in the
+/// picker window itself.
+#[derive(Clone, Copy)]
+struct OpenMenu {
+    kind: MenuKind,
+    at: Option<PointerPress>,
+    in_window: bool,
+}
+
+enum MenuLine {
+    Item {
+        id: String,
+        label: String,
+        enabled: bool,
+    },
+    Separator,
+    Label(String),
 }
 
 struct Icons {
@@ -77,14 +106,6 @@ pub(super) fn picker_height(state: &UIState) -> f32 {
     PADDING * 2.0 + ROW_HEIGHT * state.filtered_browsers.len().max(1) as f32 + 1.0 + FOOTER_HEIGHT
 }
 
-pub(super) fn is_dark(theme: ConfiguredTheme, system_dark: bool) -> bool {
-    match theme {
-        ConfiguredTheme::Auto => system_dark,
-        ConfiguredTheme::Light => false,
-        ConfiguredTheme::Dark => true,
-    }
-}
-
 impl Picker {
     pub(super) fn new(
         state: UIState,
@@ -100,7 +121,7 @@ impl Picker {
             me,
             aux,
             icons: None,
-            menu_open: false,
+            menu: None,
         }
     }
 
@@ -134,11 +155,18 @@ impl Picker {
     }
 
     pub(super) fn dismiss(&mut self, tx: &mut Tx) {
+        self.menu = None;
         if self.persistent {
             tx.close_window();
         } else {
             tx.quit();
         }
+    }
+
+    /// Hides the picker behind Settings or About; their windows end the app when they close.
+    fn hide_for_aux(&mut self) {
+        self.menu = None;
+        self.me.hide();
     }
 
     pub(super) fn show_at_cursor(&self, activation_token: Option<String>) {
@@ -165,6 +193,7 @@ impl Picker {
             } => {
                 self.state.set_url(url.clone());
                 self.state.incognito_mode = false;
+                self.menu = None;
                 if self.persistent {
                     self.show_at_cursor(activation_token);
                 }
@@ -174,6 +203,7 @@ impl Picker {
                 self.state.browsers = Arc::new(browsers);
                 self.state.filtered_browsers =
                     Arc::new(get_filtered_browsers(&self.state.url, &self.state.browsers));
+                self.menu = None;
                 if let Some(icons) = &mut self.icons {
                     icons.sync(&self.state.browsers);
                 }
@@ -185,8 +215,9 @@ impl Picker {
     }
 
     pub(super) fn on_focus(&mut self, focused: bool, tx: &mut Tx) {
+        let native_menu_open = self.menu.is_some_and(|menu| !menu.in_window);
         if !focused
-            && !self.menu_open
+            && !native_menu_open
             && !self.aux.any_open()
             && self.state.ui_settings.visual_settings.quit_on_lost_focus
         {
@@ -201,6 +232,14 @@ impl Picker {
 
     pub(super) fn on_key(&mut self, event: &KeyEvent, tx: &mut Tx) -> bool {
         self.state.incognito_mode = event.mods.shift;
+        if self.menu.is_some() {
+            if event.key == Key::Escape {
+                self.menu = None;
+                return true;
+            }
+            return false;
+        }
+
         let incognito = event.mods.shift;
         let focused = self.state.focused_index.unwrap_or(0);
         let count = self.state.filtered_browsers.len();
@@ -223,87 +262,189 @@ impl Picker {
             Key::Down if count > 0 => {
                 self.state.focused_index = Some((focused + 1) % count);
             }
-            Key::Command(',') => self.aux.show_settings(&self.state),
+            Key::Command(',') => {
+                self.aux.show_settings(&self.state);
+                self.hide_for_aux();
+            }
             Key::Command('c') => tx.copy(self.state.url.clone()),
             _ => return false,
         }
         true
     }
 
-    fn open_browser_menu(&mut self, index: usize, press: PointerPress, tx: &mut Tx) {
-        let Some(browser) = self.state.filtered_browsers.get(index).cloned() else {
-            return;
+    fn menu_lines(&self, kind: MenuKind) -> Vec<MenuLine> {
+        let item = |id: &str, label: &str, enabled: bool| MenuLine::Item {
+            id: id.to_string(),
+            label: label.to_string(),
+            enabled,
         };
-
-        let mut menu = PopupMenu::new();
-        if !browser.has_priority_ordering() {
-            menu = menu
-                .item(PopupItem::new("top", "Move to top").enabled(!browser.is_first))
-                .item(PopupItem::new("up", "Move up").enabled(!browser.is_first))
-                .item(PopupItem::new("down", "Move down").enabled(!browser.is_last))
-                .item(PopupItem::new("bottom", "Move to bottom").enabled(!browser.is_last))
-                .separator();
-        }
-        menu = menu.item(PopupItem::new("hide", "Hide profile"));
-        if browser.supports_profiles {
-            menu = menu.item(PopupItem::new("hide-all", "Hide all profiles"));
-        }
-
-        self.menu_open = true;
-        tx.popup_menu(menu, press, move |s: &mut Picker, picked, _| {
-            s.menu_open = false;
-            let profile_id = browser.unique_id.clone();
-            let message = match picked {
-                Some("top") => MessageToMain::MoveAppProfile(profile_id, MoveTo::TOP),
-                Some("up") => MessageToMain::MoveAppProfile(profile_id, MoveTo::UP),
-                Some("down") => MessageToMain::MoveAppProfile(profile_id, MoveTo::DOWN),
-                Some("bottom") => MessageToMain::MoveAppProfile(profile_id, MoveTo::BOTTOM),
-                Some("hide") => MessageToMain::HideAppProfile(profile_id),
-                Some("hide-all") => MessageToMain::HideAllProfiles(browser.unique_app_id.clone()),
-                _ => return,
-            };
-            s.send(message);
-        });
-    }
-
-    fn open_options_menu(&mut self, tx: &mut Tx) {
-        let mut menu = PopupMenu::new().item(PopupItem::new("refresh", "Refresh applications"));
-        if self.state.show_set_as_default {
-            menu = menu.item(PopupItem::new("make-default", "Make Browsers default"));
-        }
-        if !self.state.restorable_app_profiles.is_empty() {
-            let mut hidden = PopupMenu::new();
-            for profile in self.state.restorable_app_profiles.iter() {
-                hidden = hidden.item(PopupItem::new(
-                    format!("restore:{}", profile.unique_id),
-                    profile.get_full_name(),
-                ));
+        let mut lines = Vec::new();
+        match kind {
+            MenuKind::Browser(index) => {
+                let Some(browser) = self.state.filtered_browsers.get(index) else {
+                    return lines;
+                };
+                if !browser.has_priority_ordering() {
+                    lines.push(item("top", "Move to top", !browser.is_first));
+                    lines.push(item("up", "Move up", !browser.is_first));
+                    lines.push(item("down", "Move down", !browser.is_last));
+                    lines.push(item("bottom", "Move to bottom", !browser.is_last));
+                    lines.push(MenuLine::Separator);
+                }
+                lines.push(item("hide", "Hide profile", true));
+                if browser.supports_profiles {
+                    lines.push(item("hide-all", "Hide all profiles", true));
+                }
             }
-            menu = menu.separator().submenu("Restore hidden profiles", hidden);
-        }
-        menu = menu
-            .separator()
-            .item(PopupItem::new("settings", "Settings…"))
-            .item(PopupItem::new("about", "About Browsers"))
-            .item(PopupItem::new("quit", "Quit"));
-
-        self.menu_open = true;
-        tx.popup_menu(menu, "options", |s: &mut Picker, picked, tx| {
-            s.menu_open = false;
-            match picked {
-                Some("refresh") => s.send(MessageToMain::Refresh),
-                Some("make-default") => s.send(MessageToMain::SetBrowsersAsDefaultBrowser),
-                Some("settings") => s.aux.show_settings(&s.state),
-                Some("about") => s.aux.show_about(),
-                Some("quit") => tx.quit(),
-                Some(id) => {
-                    if let Some(profile_id) = id.strip_prefix("restore:") {
-                        s.send(MessageToMain::RestoreAppProfile(profile_id.to_string()));
+            MenuKind::Options => {
+                lines.push(item("refresh", "Refresh applications", true));
+                if self.state.show_set_as_default {
+                    lines.push(item("make-default", "Make brows default", true));
+                }
+                if !self.state.restorable_app_profiles.is_empty() {
+                    lines.push(MenuLine::Separator);
+                    lines.push(MenuLine::Label("Restore hidden profiles".to_string()));
+                    for profile in self.state.restorable_app_profiles.iter() {
+                        lines.push(item(
+                            &format!("restore:{}", profile.unique_id),
+                            &profile.get_full_name(),
+                            true,
+                        ));
                     }
                 }
-                None => {}
+                lines.push(MenuLine::Separator);
+                lines.push(item("settings", "Settings…", true));
+                lines.push(item("about", "About brows", true));
+                lines.push(item("quit", "Quit", true));
             }
+        }
+        lines
+    }
+
+    fn pick(&mut self, kind: MenuKind, id: &str, tx: &mut Tx) {
+        self.menu = None;
+        match kind {
+            MenuKind::Browser(index) => {
+                let Some(browser) = self.state.filtered_browsers.get(index) else {
+                    return;
+                };
+                let profile_id = browser.unique_id.clone();
+                let message = match id {
+                    "top" => MessageToMain::MoveAppProfile(profile_id, MoveTo::TOP),
+                    "up" => MessageToMain::MoveAppProfile(profile_id, MoveTo::UP),
+                    "down" => MessageToMain::MoveAppProfile(profile_id, MoveTo::DOWN),
+                    "bottom" => MessageToMain::MoveAppProfile(profile_id, MoveTo::BOTTOM),
+                    "hide" => MessageToMain::HideAppProfile(profile_id),
+                    "hide-all" => MessageToMain::HideAllProfiles(browser.unique_app_id.clone()),
+                    _ => return,
+                };
+                self.send(message);
+            }
+            MenuKind::Options => match id {
+                "refresh" => self.send(MessageToMain::Refresh),
+                "make-default" => self.send(MessageToMain::SetBrowsersAsDefaultBrowser),
+                "settings" => {
+                    self.aux.show_settings(&self.state);
+                    self.hide_for_aux();
+                }
+                "about" => {
+                    self.aux.show_about();
+                    self.hide_for_aux();
+                }
+                "quit" => tx.quit(),
+                _ => {
+                    if let Some(profile_id) = id.strip_prefix("restore:") {
+                        self.send(MessageToMain::RestoreAppProfile(profile_id.to_string()));
+                    }
+                }
+            },
+        }
+    }
+
+    /// Opens a native menu where the platform has one (Windows, macOS); elsewhere the view
+    /// draws the menu inside the picker window.
+    fn open_menu(&mut self, kind: MenuKind, at: Option<PointerPress>, tx: &mut Tx) {
+        if !popup_menu_supported() {
+            self.menu = Some(OpenMenu {
+                kind,
+                at,
+                in_window: true,
+            });
+            return;
+        }
+
+        let mut menu = PopupMenu::new();
+        for line in self.menu_lines(kind) {
+            menu = match line {
+                MenuLine::Item { id, label, enabled } => {
+                    menu.item(PopupItem::new(id, label).enabled(enabled))
+                }
+                MenuLine::Separator => menu.separator(),
+                MenuLine::Label(label) => menu.item(PopupItem::new("", label).enabled(false)),
+            };
+        }
+        self.menu = Some(OpenMenu {
+            kind,
+            at,
+            in_window: false,
         });
+        let on_pick = move |s: &mut Picker, picked: Option<&str>, tx: &mut Tx| {
+            s.menu = None;
+            if let Some(id) = picked.filter(|id| !id.is_empty()) {
+                s.pick(kind, id, tx);
+            }
+        };
+        match at {
+            Some(press) => tx.popup_menu(menu, press, on_pick),
+            None => tx.popup_menu(menu, "options", on_pick),
+        }
+    }
+
+    fn in_window_menu(&self, kind: MenuKind) -> Option<OpenMenu> {
+        self.menu.filter(|menu| menu.in_window && menu.kind == kind)
+    }
+
+    /// The in-window menu's entries; selecting one runs the same action as the native menu.
+    fn kit_menu(&self, menu: Menu, kind: MenuKind) -> Menu {
+        let mut menu = menu
+            .min_width(MENU_WIDTH)
+            .on_close(|s: &mut Picker| s.menu = None);
+        for line in self.menu_lines(kind) {
+            menu = match line {
+                MenuLine::Item { id, label, enabled } => menu.item(
+                    MenuItem::new(label)
+                        .disabled(!enabled)
+                        .on_select_tx(move |s: &mut Picker, tx: &mut Tx| s.pick(kind, &id, tx)),
+                ),
+                MenuLine::Separator => menu.separator(),
+                MenuLine::Label(label) => menu.group_label(label),
+            };
+        }
+        menu
+    }
+
+    /// Extra transparent room under the panel so an in-window menu fits in the window.
+    fn menu_room(&self) -> f32 {
+        let Some(menu) = self.menu.filter(|menu| menu.in_window) else {
+            return 0.0;
+        };
+        let menu_height: f32 = self
+            .menu_lines(menu.kind)
+            .iter()
+            .map(|line| match line {
+                MenuLine::Item { .. } => MENU_ROW_HEIGHT,
+                MenuLine::Separator => MENU_SEPARATOR_HEIGHT,
+                MenuLine::Label(_) => MENU_ROW_HEIGHT,
+            })
+            .sum::<f32>()
+            + MENU_PADDING;
+        let panel_height = picker_height(&self.state);
+        // A context menu drops from the pointer; the options menu rises from the footer.
+        let bottom = match menu.at {
+            Some(press) => press.y + menu_height,
+            None => menu_height + FOOTER_HEIGHT,
+        };
+        (bottom - panel_height).max(0.0)
     }
 }
 
@@ -327,32 +468,46 @@ fn digit_slot(key: PhysicalKeyCode) -> Option<usize> {
 }
 
 pub(super) fn view(s: &Picker, cx: &mut Cx<Picker>) -> El {
-    let dark = is_dark(s.state.ui_settings.visual_settings.theme, cx.system_dark());
-    let t = tok::theme(dark);
-    let highlight = t.text.alpha(if dark { 0.10 } else { 0.07 });
+    let k = style::kit(s.state.ui_settings.visual_settings.theme, cx);
+    let mut layer = Vec::new();
 
     let mut list = col().key("browsers").w_full();
     for (index, browser) in s.state.filtered_browsers.iter().enumerate() {
-        list = list.child(browser_row(s, index, browser, &t, highlight));
+        let browser_row = browser_row(s, index, browser, &k);
+        list = list.child(match s.in_window_menu(MenuKind::Browser(index)) {
+            Some(open) => s
+                .kit_menu(
+                    context_menu(format!("browser-menu-{index}"), browser_row, open.at),
+                    MenuKind::Browser(index),
+                )
+                .build(&k, &mut layer),
+            None => browser_row,
+        });
     }
 
     let url = text(s.state.url.clone())
         .key("url")
-        .font(type_::LABEL)
-        .color(t.text_secondary)
+        .font(k.ty.small)
+        .color(k.c.text_muted)
         .truncate()
         .grow(1.0)
         .min_w(0.0)
         .on_press_tx(|s: &mut Picker, tx: &mut Tx| tx.copy(s.state.url.clone()));
-    let options = row()
-        .key("options")
-        .h(24.0)
-        .px(8.0)
-        .radius(6.0)
-        .center_y()
-        .hover(highlight)
-        .child(text("•••").font(type_::LABEL).color(t.text_secondary))
-        .on_press_tx(|s: &mut Picker, tx: &mut Tx| s.open_options_menu(tx));
+    let options = Button::new("•••")
+        .variant(ButtonVariant::Ghost)
+        .control_size(ControlSize::Regular)
+        .on_press_tx(|s: &mut Picker, tx: &mut Tx| s.open_menu(MenuKind::Options, None, tx))
+        .build(&k)
+        .key("options");
+    let options = match s.in_window_menu(MenuKind::Options) {
+        Some(_) => s
+            .kit_menu(
+                Menu::new("options-menu").trigger(options).open(true),
+                MenuKind::Options,
+            )
+            .build(&k, &mut layer),
+        None => options,
+    };
     let footer = row()
         .key("footer")
         .h(FOOTER_HEIGHT)
@@ -363,26 +518,26 @@ pub(super) fn view(s: &Picker, cx: &mut Cx<Picker>) -> El {
         .child(url)
         .child(options);
 
-    col()
+    let panel = col()
         .key("picker")
         .w_full()
         .padding(PADDING)
         .radius(10.0)
         .clip_rounded(10.0)
-        .fill(t.card)
-        .border(1.0, t.text.alpha(0.12))
+        .fill(k.c.bg_base)
+        .border(1.0, k.c.border_base)
         .child(list)
-        .child(el().h(1.0).w_full().fill(t.separator))
-        .child(footer)
+        .child(el().h(1.0).w_full().fill(k.c.border_muted))
+        .child(footer);
+
+    let body = col()
+        .w_full()
+        .child(panel)
+        .child(el().key("menu-room").h(s.menu_room()));
+    rune_kit::root(body, layer)
 }
 
-fn browser_row(
-    s: &Picker,
-    index: usize,
-    browser: &UIBrowser,
-    t: &tok::Theme,
-    highlight: Color,
-) -> El {
+fn browser_row(s: &Picker, index: usize, browser: &UIBrowser, k: &Kit) -> El {
     let selected = s.state.focused_index == Some(index);
     let name = if s.state.incognito_mode && browser.supports_incognito {
         format!("{} · Private", browser.browser_name)
@@ -395,12 +550,12 @@ fn browser_row(
         .min_w(0.0)
         .gap(4.0)
         .center_y()
-        .child(text(name).font(type_::BODY).color(t.text));
+        .child(text(name).font(k.ty.body).color(k.c.text_base));
     if browser.supports_profiles {
         label = label.child(
             text(format!("· {}", browser.profile_name))
-                .font(type_::LABEL)
-                .color(t.text_secondary)
+                .font(k.ty.small)
+                .color(k.c.text_muted)
                 .truncate()
                 .shrink(),
         );
@@ -414,7 +569,11 @@ fn browser_row(
         .gap(8.0)
         .radius(6.0)
         .center_y()
-        .fill(if selected { highlight } else { Color::TRANSPARENT })
+        .fill(if selected {
+            k.c.hover
+        } else {
+            Color::TRANSPARENT
+        })
         .on_press_tx(move |s: &mut Picker, tx: &mut Tx| s.open_filtered(index, tx.mods().shift))
         .on_hover_change(move |s: &mut Picker, hovered, _| {
             if hovered {
@@ -422,28 +581,19 @@ fn browser_row(
             }
         })
         .on_secondary_press(move |s: &mut Picker, press, tx: &mut Tx| {
-            s.open_browser_menu(index, press, tx)
+            s.open_menu(MenuKind::Browser(index), Some(press), tx)
         })
-        .child(browser_icon(s, browser, t))
+        .child(browser_icon(s, browser, k))
         .child(label);
 
     if s.state.ui_settings.visual_settings.show_hotkeys && index < 10 {
         let hotkey = if index == 9 { 0 } else { index + 1 };
-        browser_row = browser_row.child(
-            row()
-                .h(18.0)
-                .min_w(18.0)
-                .px(4.0)
-                .radius(4.0)
-                .center()
-                .border(1.0, t.text.alpha(0.15))
-                .child(text(hotkey.to_string()).font(type_::LABEL).color(t.text_secondary)),
-        );
+        browser_row = browser_row.child(Keybind::new(&[hotkey.to_string()]).build(k));
     }
     browser_row
 }
 
-fn browser_icon(s: &Picker, browser: &UIBrowser, t: &tok::Theme) -> El {
+fn browser_icon(s: &Picker, browser: &UIBrowser, k: &Kit) -> El {
     let icon = match s.icon(&browser_icon_source(browser)) {
         Some(image) if image.error().is_none() => {
             el().size(ICON_SIZE, ICON_SIZE).pixels(image.pixels())
@@ -452,9 +602,13 @@ fn browser_icon(s: &Picker, browser: &UIBrowser, t: &tok::Theme) -> El {
             let initial = browser.browser_name.chars().next().unwrap_or('?');
             el().size(ICON_SIZE, ICON_SIZE)
                 .radius(6.0)
-                .fill(t.control_off)
+                .fill(k.c.layer_02)
                 .center()
-                .child(text(initial.to_string()).font(type_::LABEL).color(t.text_secondary))
+                .child(
+                    text(initial.to_string())
+                        .font(k.ty.small_medium)
+                        .color(k.c.text_muted),
+                )
         }
     };
 

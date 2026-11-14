@@ -1,5 +1,5 @@
-//! Opening the picker next to the pointer. Wayland can't place windows, so Linux leaves
-//! placement to the window manager.
+//! Opening the picker next to the pointer. Wayland doesn't let an app place its windows or
+//! read the pointer (anomalyco/rune#974), so there the compositor places the picker.
 
 use rune::AppHandle;
 
@@ -12,7 +12,11 @@ pub(super) fn initial_position(size: (f32, f32)) -> Option<(i32, i32)> {
     {
         windows::position_near_cursor(size)
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    {
+        x11::position_near_cursor(size)
+    }
+    #[cfg(target_os = "macos")]
     {
         let _ = size;
         None
@@ -40,12 +44,19 @@ pub(super) fn place_at_cursor<S: 'static>(handle: &AppHandle<S>, size: (f32, f32
     }
 
     #[cfg(target_os = "linux")]
-    let _ = (handle, size);
+    if let Some(position) = x11::position_near_cursor(size) {
+        handle.set_position(position);
+    }
 }
 
 /// Puts a `size` box beside `cursor` inside `area`, flipping to the other side of the pointer
 /// when it would cross the area's right or bottom edge.
-fn origin_near(cursor: (f32, f32), area: (f32, f32, f32, f32), size: (f32, f32), scale: f32) -> (f32, f32) {
+fn origin_near(
+    cursor: (f32, f32),
+    area: (f32, f32, f32, f32),
+    size: (f32, f32),
+    scale: f32,
+) -> (f32, f32) {
     let (left, top, right, bottom) = area;
     let offset = CURSOR_OFFSET * scale;
     let margin = SCREEN_MARGIN * scale;
@@ -95,7 +106,12 @@ mod windows {
         let work = info.rcWork;
         let (x, y) = super::origin_near(
             (cursor.x as f32, cursor.y as f32),
-            (work.left as f32, work.top as f32, work.right as f32, work.bottom as f32),
+            (
+                work.left as f32,
+                work.top as f32,
+                work.right as f32,
+                work.bottom as f32,
+            ),
             (size.0 * scale, size.1 * scale),
             scale,
         );
@@ -138,4 +154,67 @@ mod macos {
             1.0,
         ))
     }
+}
+
+#[cfg(target_os = "linux")]
+mod x11 {
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::ConnectionExt;
+
+    /// None on Wayland, where Rune draws through Wayland even when XWayland runs.
+    pub(super) fn position_near_cursor(size: (f32, f32)) -> Option<(i32, i32)> {
+        if std::env::var_os("WAYLAND_DISPLAY").is_some_and(|display| !display.is_empty()) {
+            return None;
+        }
+
+        let (connection, screen_index) = x11rb::connect(None).ok()?;
+        let screen = connection.setup().roots.get(screen_index)?;
+        let pointer = connection.query_pointer(screen.root).ok()?.reply().ok()?;
+
+        // The root window spans every monitor, so a picker near a monitor edge may straddle
+        // two; X11 has no portable per-monitor work area short of RandR.
+        let scale = super::x11_scale(&connection, screen);
+        let (x, y) = super::origin_near(
+            (pointer.root_x as f32, pointer.root_y as f32),
+            (
+                0.0,
+                0.0,
+                screen.width_in_pixels as f32,
+                screen.height_in_pixels as f32,
+            ),
+            (size.0 * scale, size.1 * scale),
+            scale,
+        );
+        Some((x.round() as i32, y.round() as i32))
+    }
+}
+
+/// winit's X11 scale: `Xft.dpi` from the root window's resources, over 96.
+#[cfg(target_os = "linux")]
+fn x11_scale(
+    connection: &impl x11rb::connection::Connection,
+    screen: &x11rb::protocol::xproto::Screen,
+) -> f32 {
+    use x11rb::protocol::xproto::{AtomEnum, ConnectionExt};
+
+    let resources = connection
+        .get_property(
+            false,
+            screen.root,
+            AtomEnum::RESOURCE_MANAGER,
+            AtomEnum::STRING,
+            0,
+            1 << 16,
+        )
+        .ok()
+        .and_then(|cookie| cookie.reply().ok());
+    let dpi = resources.and_then(|reply| {
+        String::from_utf8_lossy(&reply.value)
+            .lines()
+            .find_map(|line| {
+                line.strip_prefix("Xft.dpi:")
+                    .and_then(|dpi| dpi.trim().parse::<f32>().ok())
+            })
+    });
+    dpi.map_or(1.0, |dpi| dpi / 96.0)
 }

@@ -26,7 +26,7 @@ pub fn run(
         min_size: Some((PICKER_WIDTH, 0.0)),
         setup: Some(Picker::setup),
         on_key: Some(Picker::on_key),
-        ..AppSpec::new("Browsers", size, || unreachable!(), picker::view)
+        ..AppSpec::new("brows", size, || unreachable!(), picker::view)
     };
     let mut app = App::new(spec)
         .fit_content_height()
