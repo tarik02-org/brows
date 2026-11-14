@@ -80,13 +80,26 @@ fn origin_near(
 mod windows {
     use std::mem;
 
-    use winapi::shared::windef::POINT;
+    use winapi::shared::windef::{DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, POINT};
     use winapi::um::shellscalingapi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
     use winapi::um::winuser::{
         GetCursorPos, GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint,
+        SetThreadDpiAwarenessContext,
     };
 
     pub(super) fn position_near_cursor(size: (f32, f32)) -> Option<(i32, i32)> {
+        // The first picker is placed before winit makes the process DPI aware, and an unaware
+        // thread gets cursor and monitor coordinates divided by the display's scale.
+        let previous =
+            unsafe { SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
+        let position = physical_position_near_cursor(size);
+        if !previous.is_null() {
+            unsafe { SetThreadDpiAwarenessContext(previous) };
+        }
+        position
+    }
+
+    fn physical_position_near_cursor(size: (f32, f32)) -> Option<(i32, i32)> {
         let mut cursor = POINT { x: 0, y: 0 };
         if unsafe { GetCursorPos(&mut cursor) } == 0 {
             return None;
