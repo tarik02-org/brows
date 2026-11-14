@@ -34,6 +34,8 @@ pub(super) struct Picker {
     pub(super) aux: AuxWindows,
     icons: Option<Icons>,
     menu: Option<OpenMenu>,
+    /// A native macOS menu is tracking; the panel may lose key status meanwhile.
+    native_menu_open: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -120,6 +122,7 @@ impl Picker {
             aux,
             icons: None,
             menu: None,
+            native_menu_open: false,
         }
     }
 
@@ -214,6 +217,7 @@ impl Picker {
 
     pub(super) fn on_focus(&mut self, focused: bool, tx: &mut Tx) {
         if !focused
+            && !self.native_menu_open
             && !self.aux.any_open()
             && self.state.ui_settings.visual_settings.quit_on_lost_focus
         {
@@ -357,8 +361,37 @@ impl Picker {
         }
     }
 
-    fn open_menu(&mut self, kind: MenuKind, at: Option<PointerPress>) {
-        self.menu = Some(OpenMenu { kind, at });
+    /// macOS has good-looking native menus; elsewhere the menu is drawn in the picker window.
+    fn open_menu(&mut self, kind: MenuKind, at: Option<PointerPress>, tx: &mut Tx) {
+        if cfg!(target_os = "macos") {
+            self.open_native_menu(kind, at, tx);
+        } else {
+            self.menu = Some(OpenMenu { kind, at });
+        }
+    }
+
+    fn open_native_menu(&mut self, kind: MenuKind, at: Option<PointerPress>, tx: &mut Tx) {
+        let mut menu = rune::PopupMenu::new();
+        for line in self.menu_lines(kind) {
+            menu = match line {
+                MenuLine::Item { id, label, enabled } => {
+                    menu.item(rune::PopupItem::new(id, label).enabled(enabled))
+                }
+                MenuLine::Separator => menu.separator(),
+                MenuLine::Label(label) => menu.item(rune::PopupItem::new("", label).enabled(false)),
+            };
+        }
+        self.native_menu_open = true;
+        let on_pick = move |s: &mut Picker, picked: Option<&str>, tx: &mut Tx| {
+            s.native_menu_open = false;
+            if let Some(id) = picked.filter(|id| !id.is_empty()) {
+                s.pick(kind, id, tx);
+            }
+        };
+        match at {
+            Some(press) => tx.popup_menu(menu, press, on_pick),
+            None => tx.popup_menu(menu, "options", on_pick),
+        }
     }
 
     fn open_menu_of(&self, kind: MenuKind) -> Option<OpenMenu> {
@@ -457,7 +490,7 @@ pub(super) fn view(s: &Picker, cx: &mut Cx<Picker>) -> El {
     let options = Button::new("•••")
         .variant(ButtonVariant::Ghost)
         .control_size(ControlSize::Regular)
-        .on_press(|s: &mut Picker| s.open_menu(MenuKind::Options, None))
+        .on_press_tx(|s: &mut Picker, tx: &mut Tx| s.open_menu(MenuKind::Options, None, tx))
         .build(&k)
         .key("options");
     let options = match s.open_menu_of(MenuKind::Options) {
@@ -541,8 +574,8 @@ fn browser_row(s: &Picker, index: usize, browser: &UIBrowser, k: &Kit) -> El {
                 s.state.focused_index = Some(index);
             }
         })
-        .on_secondary_press(move |s: &mut Picker, press, _: &mut Tx| {
-            s.open_menu(MenuKind::Browser(index), Some(press))
+        .on_secondary_press(move |s: &mut Picker, press, tx: &mut Tx| {
+            s.open_menu(MenuKind::Browser(index), Some(press), tx)
         })
         .child(browser_icon(s, browser, k))
         .child(label);
