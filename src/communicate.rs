@@ -8,8 +8,8 @@ use zbus::zvariant::{OwnedValue, Str};
 
 use crate::MessageToMain;
 
-const APPLICATION_NAME: &str = "software.Browsers";
-const APPLICATION_PATH: &str = "/software/Browsers";
+const APPLICATION_NAME: &str = "me.tarik02.brows";
+const APPLICATION_PATH: &str = "/me/tarik02/brows";
 const APPLICATION_INTERFACE: &str = "org.freedesktop.Application";
 const ACTIVATION_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -74,7 +74,7 @@ impl ApplicationService {
 }
 
 fn backend_stopped() -> zbus::fdo::Error {
-    zbus::fdo::Error::Failed("Browsers backend stopped".to_string())
+    zbus::fdo::Error::Failed("brows backend stopped".to_string())
 }
 
 fn activation_token(platform_data: &HashMap<String, OwnedValue>) -> Option<String> {

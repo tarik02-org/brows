@@ -1,20 +1,20 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/tarik02-org/browsers-gpui/main/resources/icons/256x256/software.Browsers.png" width="128" />
-  <h1 align="center">Browsers</h1>
+  <img src="https://raw.githubusercontent.com/tarik02-org/brows/main/resources/icons/256x256/me.tarik02.brows.png" width="128" />
+  <h1 align="center">brows</h1>
   <h3 align="center">Open the right browser at the right time</h3>
   <h3 align="center">For Linux, Mac and Windows</h3>
 </p>
 
 ![MIT/Apache 2.0](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)
 
-> This fork replaces the original Druid interface with a compact GPUI and
-> gpui-component desktop interface.
+> brows is a fork of [Browsers](https://github.com/Browsers-software/browsers)
+> by Madis Liias with a Rune interface.
 
 ## Description
 
-Browsers is an intuitive context menu that pops up when you press a link in an app other than a web browser.
+brows is an intuitive context menu that pops up when you press a link in an app other than a web browser.
 
-![A link opens the Browsers profile picker.](docs/screenshots/picker.png)
+![A link opens the brows profile picker.](docs/screenshots/picker.png)
 
 <p align="center">
   <a href="docs/screenshots/settings-general.png"><img src="docs/screenshots/settings-general.png" alt="General settings" width="32%" /></a>
@@ -43,41 +43,41 @@ Browsers is an intuitive context menu that pops up when you press a link in an a
 Run directly from the repository:
 
 ```sh
-nix run github:tarik02-org/browsers-gpui
+nix run github:tarik02-org/brows
 ```
 
 Or add the flake as an input and use its package directly:
 
 ```nix
-inputs.browsers-gpui.url = "github:tarik02-org/browsers-gpui";
+inputs.brows.url = "github:tarik02-org/brows";
 
 environment.systemPackages = [
-  inputs.browsers-gpui.packages.${pkgs.system}.default
+  inputs.brows.packages.${pkgs.system}.default
 ];
 ```
 
 Release archives are published on
-[GitHub](https://github.com/tarik02-org/browsers-gpui/releases/latest).
+[GitHub](https://github.com/tarik02-org/brows/releases/latest).
 
 - macOS
-  - [**Browsers.dmg**](https://github.com/tarik02-org/browsers-gpui/releases/latest/download/Browsers.dmg) (Apple Silicon and Intel based Macs)
+  - [**brows.dmg**](https://github.com/tarik02-org/brows/releases/latest/download/brows.dmg) (Apple Silicon and Intel based Macs)
 - Linux
   - DEB package
-    - [**browsers_amd64.deb**](https://github.com/tarik02-org/browsers-gpui/releases/latest/download/browsers_amd64.deb) (x86_64)
-    - [**browsers_arm64.deb**](https://github.com/tarik02-org/browsers-gpui/releases/latest/download/browsers_arm64.deb) (arm64)
-    - [**browsers_armhf.deb**](https://github.com/tarik02-org/browsers-gpui/releases/latest/download/browsers_armhf.deb) (armv7l)
+    - [**brows_amd64.deb**](https://github.com/tarik02-org/brows/releases/latest/download/brows_amd64.deb) (x86_64)
+    - [**brows_arm64.deb**](https://github.com/tarik02-org/brows/releases/latest/download/brows_arm64.deb) (arm64)
+    - [**brows_armhf.deb**](https://github.com/tarik02-org/brows/releases/latest/download/brows_armhf.deb) (armv7l)
   - RPM package
-    - [**browsers.x86_64.rpm**](https://github.com/tarik02-org/browsers-gpui/releases/latest/download/browsers.x86_64.rpm) (x86_64)
-    - [**browsers.aarch64.rpm**](https://github.com/tarik02-org/browsers-gpui/releases/latest/download/browsers.aarch64.rpm) (arm64)
-    - [**browsers.armhfp.rpm**](https://github.com/tarik02-org/browsers-gpui/releases/latest/download/browsers.armhfp.rpm) (armv7l)
-  - Universal - [**browsers_linux.tar.gz**](https://github.com/tarik02-org/browsers-gpui/releases/latest/download/browsers_linux.tar.gz) (x86_64, arm64 and armv7l)
+    - [**brows.x86_64.rpm**](https://github.com/tarik02-org/brows/releases/latest/download/brows.x86_64.rpm) (x86_64)
+    - [**brows.aarch64.rpm**](https://github.com/tarik02-org/brows/releases/latest/download/brows.aarch64.rpm) (arm64)
+    - [**brows.armhfp.rpm**](https://github.com/tarik02-org/brows/releases/latest/download/brows.armhfp.rpm) (armv7l)
+  - Universal - [**brows_linux.tar.gz**](https://github.com/tarik02-org/brows/releases/latest/download/brows_linux.tar.gz) (x86_64, arm64 and armv7l)
   - Nix - use the repository flake described above
   - AUR - [browsers-bin](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=browsers-bin) and [browsers-git](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=browsers-git)
-- Windows - [**Browsers_windows.zip**](https://github.com/tarik02-org/browsers-gpui/releases/latest/download/Browsers_windows.zip) (x86_64 and arm64)
+- Windows - [**brows_windows.zip**](https://github.com/tarik02-org/brows/releases/latest/download/brows_windows.zip) (x86_64 and arm64)
 
 ## License
 
-Browsers is free and open source! All code in this repository is dual-licensed under either:
+brows is free and open source! All code in this repository is dual-licensed under either:
 
 * MIT License ([LICENSE-MIT](LICENSE-MIT) or [http://opensource.org/licenses/MIT](http://opensource.org/licenses/MIT))
 * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE)

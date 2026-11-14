@@ -16,7 +16,7 @@ readonly SETTINGS_CROP_HEIGHT=1076
 readonly HEADLESSDESK_URL=http://127.0.0.1:42439
 readonly LINK_X=1040
 readonly LINK_Y=544
-readonly DEMO_URL=https://github.com/tarik02-org/browsers-gpui
+readonly DEMO_URL=https://github.com/tarik02-org/brows
 
 die() {
   printf 'capture-readme-screenshots: %s\n' "$*" >&2
@@ -124,10 +124,10 @@ capture_settings_screenshot() {
 session_cleanup() {
   local process_id
   for process_id in \
-    "${BROWSERS_CAPTURE_SOURCE_PID:-}" \
-    "${BROWSERS_CAPTURE_BROWSERS_PID:-}" \
-    "${BROWSERS_CAPTURE_HEADLESSDESK_PID:-}" \
-    "${BROWSERS_CAPTURE_KWIN_PID:-}"; do
+    "${BROWS_CAPTURE_SOURCE_PID:-}" \
+    "${BROWS_CAPTURE_BROWS_PID:-}" \
+    "${BROWS_CAPTURE_HEADLESSDESK_PID:-}" \
+    "${BROWS_CAPTURE_KWIN_PID:-}"; do
     if [[ -n $process_id ]]; then
       kill "$process_id" 2>/dev/null || true
     fi
@@ -136,10 +136,10 @@ session_cleanup() {
 }
 
 capture_session() {
-  local workdir=${BROWSERS_CAPTURE_WORKDIR:?}
+  local workdir=${BROWS_CAPTURE_WORKDIR:?}
   local state_dir=$workdir/state
   local screenshots_dir=$workdir/screenshots
-  local app_log=$state_dir/software.Browsers/logs/browsers.log
+  local app_log=$state_dir/me.tarik02.brows/logs/brows.log
 
   trap session_cleanup EXIT
 
@@ -155,7 +155,7 @@ capture_session() {
     --no-global-shortcuts \
     --no-kactivities \
     >"$workdir/logs/kwin.log" 2>&1 &
-  BROWSERS_CAPTURE_KWIN_PID=$!
+  BROWS_CAPTURE_KWIN_PID=$!
 
   wait_until 15 test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ||
     die "KWin did not create its Wayland socket"
@@ -170,27 +170,27 @@ capture_session() {
     --config "$workdir/headlessdesk.yaml" \
     --listen-addr "${HEADLESSDESK_URL#http://}" \
     >"$workdir/logs/headlessdesk.log" 2>&1 &
-  BROWSERS_CAPTURE_HEADLESSDESK_PID=$!
+  BROWS_CAPTURE_HEADLESSDESK_PID=$!
 
   wait_until 10 curl --fail --silent --output /dev/null \
     "${HEADLESSDESK_URL}/healthz" || die "headlessdesk did not become ready"
 
-  "$BROWSERS_BIN" --daemon >"$workdir/logs/browsers.stdout.log" 2>&1 &
-  BROWSERS_CAPTURE_BROWSERS_PID=$!
-  wait_until 15 busctl --user status software.Browsers >/dev/null 2>&1 ||
-    die "Browsers daemon did not register on D-Bus"
+  "$BROWS_BIN" --daemon >"$workdir/logs/brows.stdout.log" 2>&1 &
+  BROWS_CAPTURE_BROWS_PID=$!
+  wait_until 15 busctl --user status me.tarik02.brows >/dev/null 2>&1 ||
+    die "brows daemon did not register on D-Bus"
 
-  qml "$BROWSERS_CAPTURE_ASSET_DIR/source.qml" \
+  qml "$BROWS_CAPTURE_ASSET_DIR/source.qml" \
     >"$workdir/logs/source.log" 2>&1 &
-  BROWSERS_CAPTURE_SOURCE_PID=$!
+  BROWS_CAPTURE_SOURCE_PID=$!
   sleep 0.6
-  kill -0 "$BROWSERS_CAPTURE_SOURCE_PID" 2>/dev/null ||
+  kill -0 "$BROWS_CAPTURE_SOURCE_PID" 2>/dev/null ||
     die "the source window exited before capture"
 
   api_move "$LINK_X" "$LINK_Y"
   sleep 0.1
   api_click "$LINK_X" "$LINK_Y"
-  "$BROWSERS_BIN" "$DEMO_URL" >"$workdir/logs/activation.log" 2>&1
+  "$BROWS_BIN" "$DEMO_URL" >"$workdir/logs/activation.log" 2>&1
   wait_until 8 grep --fixed-strings --quiet 'Created picker window' "$app_log" ||
     die "the picker did not open"
   api_move $((LINK_X - 40)) "$LINK_Y"
@@ -210,25 +210,25 @@ capture_session() {
   capture_settings_screenshot "$screenshots_dir/settings-advanced.png"
 }
 
-if [[ ${BROWSERS_CAPTURE_SESSION:-0} == 1 ]]; then
+if [[ ${BROWS_CAPTURE_SESSION:-0} == 1 ]]; then
   capture_session
   exit 0
 fi
 
-if [[ ${BROWSERS_CAPTURE_WRAPPED:-0} != 1 ]]; then
+if [[ ${BROWS_CAPTURE_WRAPPED:-0} != 1 ]]; then
   command -v nix >/dev/null 2>&1 ||
     die "Nix is required; run this through 'nix run ./tools/readme-screenshots'"
   repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-  export BROWSERS_CAPTURE_REPO_ROOT=$repo_root
-  export BROWSERS_CAPTURE_DEFAULT_OUTPUT_DIR=$repo_root/docs/screenshots
+  export BROWS_CAPTURE_REPO_ROOT=$repo_root
+  export BROWS_CAPTURE_DEFAULT_OUTPUT_DIR=$repo_root/docs/screenshots
   exec nix run "path:${repo_root}/tools/readme-screenshots" -- "$@"
 fi
 
-repo_root=${BROWSERS_CAPTURE_REPO_ROOT:-$PWD}
+repo_root=${BROWS_CAPTURE_REPO_ROOT:-$PWD}
 [[ -f $repo_root/Cargo.toml && -f $repo_root/flake.nix ]] ||
-  die "run from the Browsers repository root"
+  die "run from the brows repository root"
 
-output_dir=${OUTPUT_DIR:-${BROWSERS_CAPTURE_DEFAULT_OUTPUT_DIR:-$repo_root/docs/screenshots}}
+output_dir=${OUTPUT_DIR:-${BROWS_CAPTURE_DEFAULT_OUTPUT_DIR:-$repo_root/docs/screenshots}}
 keep_workdir=${KEEP_WORKDIR:-0}
 
 while (($# > 0)); do
@@ -265,11 +265,11 @@ output_dir=$(realpath --canonicalize-missing "$output_dir")
 mkdir -p "$output_dir"
 
 browser_package=$(nix build "path:${repo_root}#default" --no-link --print-out-paths)
-export BROWSERS_BIN=${BROWSERS_BIN:-$browser_package/bin/browsers}
-export BROWSERS_CAPTURE_BROWSERS_SHARE=${BROWSERS_CAPTURE_BROWSERS_SHARE:-$browser_package/share}
+export BROWS_BIN=${BROWS_BIN:-$browser_package/bin/brows}
+export BROWS_CAPTURE_BROWS_SHARE=${BROWS_CAPTURE_BROWS_SHARE:-$browser_package/share}
 
-workdir=$(mktemp -d "${TMPDIR:-/tmp}/browsers-readme-screenshots.XXXXXXXX")
-visible_root=${BROWSERS_CAPTURE_VISIBLE_ROOT:-${TMPDIR:-/tmp}/browsers-readme-screenshots}
+workdir=$(mktemp -d "${TMPDIR:-/tmp}/brows-readme-screenshots.XXXXXXXX")
+visible_root=${BROWS_CAPTURE_VISIBLE_ROOT:-${TMPDIR:-/tmp}/brows-readme-screenshots}
 capture_succeeded=0
 cleanup_workdir() {
   local exit_status=$?
@@ -290,7 +290,7 @@ ln -s "$workdir" "$visible_root" ||
 mkdir -p \
   "$workdir/bin" \
   "$workdir/cache" \
-  "$workdir/config/software.Browsers" \
+  "$workdir/config/me.tarik02.brows" \
   "$workdir/data/applications" \
   "$workdir/screenshots" \
   "$workdir/home" \
@@ -312,17 +312,17 @@ rsvg-convert \
   --width 64 \
   --height 64 \
   --output "$workdir/icons/google-chrome.png" \
-  "$BROWSERS_CAPTURE_ICON_DIR/google-chrome.svg"
+  "$BROWS_CAPTURE_ICON_DIR/google-chrome.svg"
 rsvg-convert \
   --width 64 \
   --height 64 \
   --output "$workdir/icons/brave.png" \
-  "$BROWSERS_CAPTURE_ICON_DIR/brave.svg"
+  "$BROWS_CAPTURE_ICON_DIR/brave.svg"
 rsvg-convert \
   --width 64 \
   --height 64 \
   --output "$workdir/icons/chromium.png" \
-  "$BROWSERS_CAPTURE_ICON_DIR/chromium-browser.svg"
+  "$BROWS_CAPTURE_ICON_DIR/chromium-browser.svg"
 cat >"$workdir/bin/fake-browser" <<'EOF'
 #!/usr/bin/env bash
 exit 0
@@ -362,12 +362,12 @@ MimeType=x-scheme-handler/http;x-scheme-handler/https;
 NoDisplay=true
 EOF
 
-cat >"$workdir/data/applications/software.Browsers.desktop" <<EOF
+cat >"$workdir/data/applications/me.tarik02.brows.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Browsers
-Exec=$BROWSERS_BIN %u
-Icon=software.Browsers
+Name=brows
+Exec=$BROWS_BIN %u
+Icon=me.tarik02.brows
 MimeType=x-scheme-handler/http;x-scheme-handler/https;
 DBusActivatable=true
 NoDisplay=true
@@ -375,8 +375,8 @@ EOF
 
 cat >"$workdir/config/mimeapps.list" <<'EOF'
 [Default Applications]
-x-scheme-handler/http=software.Browsers.desktop;
-x-scheme-handler/https=software.Browsers.desktop;
+x-scheme-handler/http=me.tarik02.brows.desktop;
+x-scheme-handler/https=me.tarik02.brows.desktop;
 EOF
 
 mkdir -p \
@@ -441,7 +441,7 @@ cat >"$workdir/config/chromium/Local State" <<'EOF'
 }
 EOF
 
-cat >"$workdir/config/software.Browsers/config.json" <<EOF
+cat >"$workdir/config/me.tarik02.brows/config.json" <<EOF
 {
   "hidden_apps": [],
   "hidden_profiles": ["$workdir/bin/chromium#Default"],
@@ -495,8 +495,8 @@ cat >"$workdir/fontconfig.conf" <<EOF
 <?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
 <fontconfig>
-  <dir>$BROWSERS_CAPTURE_INTER_FONT_DIR</dir>
-  <dir>$BROWSERS_CAPTURE_DEJAVU_FONT_DIR</dir>
+  <dir>$BROWS_CAPTURE_INTER_FONT_DIR</dir>
+  <dir>$BROWS_CAPTURE_DEJAVU_FONT_DIR</dir>
   <cachedir>$workdir/cache/fontconfig</cachedir>
   <alias>
     <family>sans-serif</family>
@@ -505,7 +505,7 @@ cat >"$workdir/fontconfig.conf" <<EOF
 </fontconfig>
 EOF
 
-export BROWSERS_CAPTURE_WORKDIR=$workdir
+export BROWS_CAPTURE_WORKDIR=$workdir
 export DISPLAY=
 export FONTCONFIG_FILE=$workdir/fontconfig.conf
 export HOME=$visible_root/home
@@ -514,7 +514,7 @@ export KDE_SESSION_VERSION=6
 export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 export LIBGL_ALWAYS_SOFTWARE=1
-export LIBGL_DRIVERS_PATH=$BROWSERS_CAPTURE_MESA/lib/dri
+export LIBGL_DRIVERS_PATH=$BROWS_CAPTURE_MESA/lib/dri
 export MESA_LOADER_DRIVER_OVERRIDE=llvmpipe
 export NO_PROXY=127.0.0.1
 export PATH=$workdir/bin:$PATH
@@ -522,19 +522,19 @@ export QT_QPA_PLATFORM=wayland
 export QT_QPA_PLATFORMTHEME=kde
 export QT_NO_XDG_DESKTOP_PORTAL=1
 export TZ=UTC
-export VK_DRIVER_FILES=$BROWSERS_CAPTURE_VK_DRIVER
-export VK_ICD_FILENAMES=$BROWSERS_CAPTURE_VK_DRIVER
-export WAYLAND_DISPLAY=browsers-readme-screenshots
+export VK_DRIVER_FILES=$BROWS_CAPTURE_VK_DRIVER
+export VK_ICD_FILENAMES=$BROWS_CAPTURE_VK_DRIVER
+export WAYLAND_DISPLAY=brows-readme-screenshots
 export XDG_CACHE_HOME=$visible_root/cache
 export XDG_CONFIG_HOME=$visible_root/config
 export XDG_CURRENT_DESKTOP=KDE
-export XDG_DATA_DIRS=$workdir/data:$BROWSERS_CAPTURE_BROWSERS_SHARE:$BROWSERS_CAPTURE_HEADLESSDESK_SHARE:$BROWSERS_CAPTURE_SPECTACLE_SHARE
+export XDG_DATA_DIRS=$workdir/data:$BROWS_CAPTURE_BROWS_SHARE:$BROWS_CAPTURE_HEADLESSDESK_SHARE:$BROWS_CAPTURE_SPECTACLE_SHARE
 export XDG_DATA_HOME=$visible_root/data
 export XDG_RUNTIME_DIR=$visible_root/runtime
 export XDG_STATE_HOME=$visible_root/state
 
 printf 'capture-readme-screenshots: capturing isolated KDE session\n'
-if ! BROWSERS_CAPTURE_SESSION=1 dbus-run-session -- "$0" \
+if ! BROWS_CAPTURE_SESSION=1 dbus-run-session -- "$0" \
   >"$workdir/logs/session.log" 2>&1; then
   tail -n 120 "$workdir/logs/session.log" >&2
   die "capture failed"

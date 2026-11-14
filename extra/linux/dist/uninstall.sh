@@ -66,24 +66,24 @@ fi
 # Print all rm commands for observability
 set -x
 
-rm -rf "$XDG_CACHE_HOME/software.Browsers/"
-rm -rf "$XDG_CONFIG_HOME/software.Browsers/"
-rm -rf "$XDG_STATE_HOME/software.Browsers/"
+rm -rf "$XDG_CACHE_HOME/me.tarik02.brows/"
+rm -rf "$XDG_CONFIG_HOME/me.tarik02.brows/"
+rm -rf "$XDG_STATE_HOME/me.tarik02.brows/"
 
-rm -f "$INSTALL_DIR/browsers"
+rm -f "$INSTALL_DIR/brows"
 
-rm -rf "$DATA_PARENT_DIR/software.Browsers/"
-rm -f "$TARGET_XFCE4_HELPERS_DIR/software.Browsers.desktop"
+rm -rf "$DATA_PARENT_DIR/me.tarik02.brows/"
+rm -f "$TARGET_XFCE4_HELPERS_DIR/me.tarik02.brows.desktop"
 
 for size in 16 32 64 128 256 512; do
-  rm -f "$ICONS_DIR/hicolor/${size}x${size}/apps/software.Browsers.png"
+  rm -f "$ICONS_DIR/hicolor/${size}x${size}/apps/me.tarik02.brows.png"
 done
 
-rm -f "$TARGET_DESKTOP_DIR_PATH/software.Browsers.desktop"
-rm -f "$TARGET_DBUS_SERVICE_DIR/software.Browsers.service"
+rm -f "$TARGET_DESKTOP_DIR_PATH/me.tarik02.brows.desktop"
+rm -f "$TARGET_DBUS_SERVICE_DIR/me.tarik02.brows.service"
 
 set +x
 
 update-desktop-database "$TARGET_DESKTOP_DIR_PATH"
 
-echo "Browsers has been uninstalled."
+echo "brows has been uninstalled."

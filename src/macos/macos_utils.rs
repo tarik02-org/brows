@@ -7,8 +7,10 @@ use crate::browser_repository::SupportedAppRepository;
 use crate::macos::macos_native;
 use crate::{InstalledBrowser, macos};
 
-const APP_DIR_NAME: &'static str = "software.Browsers";
-const APP_BUNDLE_ID: &'static str = "software.Browsers";
+const APP_DIR_NAME: &'static str = "me.tarik02.brows";
+const APP_BUNDLE_ID: &'static str = "me.tarik02.brows";
+// Data directory name used before the rename to brows.
+const LEGACY_APP_DIR_NAME: &'static str = "software.Browsers";
 
 /// get macOS application support directory for this app, supports sandboxing
 pub fn get_this_app_support_dir() -> PathBuf {
@@ -127,7 +129,7 @@ impl OsHelper {
         icons_root_dir: &Path,
         restricted_domain_patterns: Vec<String>,
     ) -> Option<InstalledBrowser> {
-        if bundle_id == "software.Browsers" {
+        if bundle_id == "me.tarik02.brows" {
             // this is us, skip
             return None;
         }
@@ -174,30 +176,30 @@ impl OsHelper {
     }
 }
 
-// e.g /Applications/Browsers.app/Contents/Resources/
+// e.g /Applications/brows.app/Contents/Resources/
 pub fn get_this_app_resources_dir() -> PathBuf {
     let app_bundle_dir = get_this_app_bundle_dir();
     app_bundle_dir.join("Contents").join("Resources")
 }
 
-// e.g /Applications/Browsers.app/
+// e.g /Applications/brows.app/
 pub fn get_this_app_bundle_dir() -> PathBuf {
     get_bundle_path(APP_BUNDLE_ID).unwrap_or_else(|| get_this_app_bundle_dir_fallback())
 }
 
 fn get_this_app_bundle_dir_fallback() -> PathBuf {
-    // .../Browsers.app/Contents/MacOS/browsers
+    // .../brows.app/Contents/MacOS/brows
     let binary_file_path =
         fs::canonicalize(std::env::current_exe().expect("Can't find current executable"))
             .expect("Can't canonicalize current executable path");
 
-    // .../Browsers.app/Contents/MacOS/
+    // .../brows.app/Contents/MacOS/
     let binary_dir_path = binary_file_path.parent().unwrap();
 
-    // .../Browsers.app/Contents/
+    // .../brows.app/Contents/
     let contents_dir_path = binary_dir_path.parent().unwrap();
 
-    // .../Browsers.app/
+    // .../brows.app/
     let bundle_dir_path = contents_dir_path.parent().unwrap();
 
     bundle_dir_path.to_path_buf()
@@ -210,12 +212,12 @@ fn get_bundle_path(bundle_id: &str) -> Option<PathBuf> {
         .map(|bundle_path| PathBuf::from(bundle_path.as_str()))
 }
 
-// ~/Library/Caches/software.Browsers/runtime/
+// ~/Library/Caches/me.tarik02.brows/runtime/
 pub fn get_this_app_runtime_dir() -> PathBuf {
     get_this_app_cache_root_dir().join("runtime")
 }
 
-// ~/Library/Caches/software.Browsers/
+// ~/Library/Caches/me.tarik02.brows/
 pub fn get_this_app_cache_root_dir() -> PathBuf {
     let cache_dir_root = macos_native::macos_get_caches_dir();
     cache_dir_root.join(APP_DIR_NAME)
@@ -233,6 +235,11 @@ pub fn macos_get_logs_dir() -> PathBuf {
 
 pub fn get_this_app_config_root_dir() -> PathBuf {
     get_this_app_support_dir()
+}
+
+// ~/Library/Application Support/software.Browsers
+pub fn get_legacy_app_config_root_dir() -> PathBuf {
+    macos_native::macos_get_application_support_dir_path().join(LEGACY_APP_DIR_NAME)
 }
 
 /*pub fn find_bundle_ids_for_browsers() -> Vec<String> {

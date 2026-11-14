@@ -1,3 +1,3 @@
 [D-BUS Service]
-Name=software.Browsers
+Name=me.tarik02.brows
 Exec=€ExecCommand€ --daemon

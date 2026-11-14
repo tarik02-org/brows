@@ -70,7 +70,7 @@ jobs:
       - name: Download release artifacts
         uses: actions/download-artifact@v8
         with:
-          pattern: browsers-*-artifacts
+          pattern: brows-*-artifacts
           run-id: ${{ steps.source.outputs.run_id }}
           github-token: ${{ github.token }}
 
@@ -78,9 +78,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ -d browsers-linux-artifacts ]]
-          [[ -d browsers-mac-artifacts ]]
-          [[ -d browsers-windows-artifacts ]]
+          [[ -d brows-linux-artifacts ]]
+          [[ -d brows-mac-artifacts ]]
+          [[ -d brows-windows-artifacts ]]
 
       - id: release
         name: Resolve nightly release
@@ -92,7 +92,7 @@ jobs:
 
           base_version="$(
             cargo metadata --no-deps --format-version 1 |
-              jq -r '.packages[] | select(.name == "browsers") | .version'
+              jq -r '.packages[] | select(.name == "brows") | .version'
           )"
           date="$(date -u +%Y%m%d)"
           version="$base_version-nightly.$date.$GITHUB_RUN_NUMBER"
@@ -101,7 +101,7 @@ jobs:
           {
             echo "version=$version"
             echo "tag=v$version"
-            echo "name=Browsers nightly $version ($short_sha)"
+            echo "name=brows nightly $version ($short_sha)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Publish nightly release
@@ -114,24 +114,24 @@ jobs:
           prerelease: true
           make_latest: false
           files: |
-            browsers-linux-artifacts/browsers_linux.tar.gz
-            browsers-linux-artifacts/browsers_linux.tar.gz.sha256
-            browsers-linux-artifacts/browsers_linux.tar.xz
-            browsers-linux-artifacts/browsers_linux.tar.xz.sha256
-            browsers-linux-artifacts/x86_64/browsers_amd64.deb
-            browsers-linux-artifacts/aarch64/browsers_arm64.deb
-            browsers-linux-artifacts/armv7l/browsers_armhf.deb
-            browsers-linux-artifacts/x86_64/browsers.x86_64.rpm
-            browsers-linux-artifacts/aarch64/browsers.aarch64.rpm
-            browsers-linux-artifacts/armv7l/browsers.armhfp.rpm
-            browsers-mac-artifacts/Browsers.dmg
-            browsers-mac-artifacts/browsers_mac.tar.gz
-            browsers-mac-artifacts/browsers_mac.tar.gz.sha256
-            browsers-mac-artifacts/browsers_mac.tar.xz
-            browsers-mac-artifacts/browsers_mac.tar.xz.sha256
-            browsers-windows-artifacts/Browsers_windows.zip
-            browsers-windows-artifacts/browsers_windows.tar.gz
-            browsers-windows-artifacts/browsers_windows.tar.gz.sha256
-            browsers-windows-artifacts/browsers_windows.tar.xz
-            browsers-windows-artifacts/browsers_windows.tar.xz.sha256
+            brows-linux-artifacts/brows_linux.tar.gz
+            brows-linux-artifacts/brows_linux.tar.gz.sha256
+            brows-linux-artifacts/brows_linux.tar.xz
+            brows-linux-artifacts/brows_linux.tar.xz.sha256
+            brows-linux-artifacts/x86_64/brows_amd64.deb
+            brows-linux-artifacts/aarch64/brows_arm64.deb
+            brows-linux-artifacts/armv7l/brows_armhf.deb
+            brows-linux-artifacts/x86_64/brows.x86_64.rpm
+            brows-linux-artifacts/aarch64/brows.aarch64.rpm
+            brows-linux-artifacts/armv7l/brows.armhfp.rpm
+            brows-mac-artifacts/brows.dmg
+            brows-mac-artifacts/brows_mac.tar.gz
+            brows-mac-artifacts/brows_mac.tar.gz.sha256
+            brows-mac-artifacts/brows_mac.tar.xz
+            brows-mac-artifacts/brows_mac.tar.xz.sha256
+            brows-windows-artifacts/brows_windows.zip
+            brows-windows-artifacts/brows_windows.tar.gz
+            brows-windows-artifacts/brows_windows.tar.gz.sha256
+            brows-windows-artifacts/brows_windows.tar.xz
+            brows-windows-artifacts/brows_windows.tar.xz.sha256
           fail_on_unmatched_files: true

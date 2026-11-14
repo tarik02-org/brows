@@ -69,17 +69,17 @@ if %is_admin% == true (
     )
 )
 
-REM C:\Users\x\AppData\Local\software.Browsers\
+REM C:\Users\x\AppData\Local\me.tarik02.brows\
 
 if %is_local_install% == true (
     REM TODO: would be even more correct to take from registry
     set LocalProgramsDir=%LocalAppData%\Programs
     setlocal EnableDelayedExpansion
-    set ProgramDir=!LocalProgramsDir!\software.Browsers
+    set ProgramDir=!LocalProgramsDir!\me.tarik02.brows
     setlocal DisableDelayedExpansion
     echo Installing only for current user
 ) else (
-    set ProgramDir=%ProgramFiles%\software.Browsers
+    set ProgramDir=%ProgramFiles%\me.tarik02.brows
     echo Installing for all users
 )
 
@@ -92,13 +92,13 @@ if not exist "%ProgramDir%\" (
 REM .bat location with trailing \
 set THIS_DIR=%~dp0
 
-set SRC_BINARY_PATH=%THIS_DIR%%ARCH%\browsers.exe
+set SRC_BINARY_PATH=%THIS_DIR%%ARCH%\brows.exe
 
 FOR /F "delims=" %%F IN ('powershell -NoLogo -NoProfile -Command ^(Get-Item \"%SRC_BINARY_PATH%\"^).VersionInfo.FileVersion') DO (SET APP_VERSION=%%F)
 
-echo Browsers Version: %APP_VERSION%
+echo brows Version: %APP_VERSION%
 
-copy "%SRC_BINARY_PATH%" "%ProgramDir%\browsers.exe" 1>nul
+copy "%SRC_BINARY_PATH%" "%ProgramDir%\brows.exe" 1>nul
 
 copy "%THIS_DIR%uninstall.bat" "%ProgramDir%\uninstall.bat" 1>nul
 
@@ -106,7 +106,7 @@ if not exist "%ProgramDir%\resources\icons\512x512\" (
   mkdir "%ProgramDir%\resources\icons\512x512" || exit /b
 )
 
-copy "%THIS_DIR%resources\icons\512x512\software.Browsers.png" "%ProgramDir%\resources\icons\512x512\software.Browsers.png" 1>nul
+copy "%THIS_DIR%resources\icons\512x512\me.tarik02.brows.png" "%ProgramDir%\resources\icons\512x512\me.tarik02.brows.png" 1>nul
 
 if not exist "%ProgramDir%\resources\i18n\en-US\" (
   mkdir "%ProgramDir%\resources\i18n\en-US" || exit /b
@@ -119,21 +119,21 @@ if not exist "%ProgramDir%\resources\repository\" (
 )
 copy "%THIS_DIR%resources\repository\application-repository.toml" "%ProgramDir%\resources\repository\application-repository.toml" 1>nul
 
-REM C:\Users\x\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Browsers\Browsers.lnk
+REM C:\Users\x\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\brows\brows.lnk
 
 if %is_local_install% == true (
-    set ShortcutFromPath="%THIS_DIR%startmenu\user\Browsers.lnk"
-    set ShortcutToDir=%AppData%\Microsoft\Windows\Start Menu\Programs\Browsers
+    set ShortcutFromPath="%THIS_DIR%startmenu\user\brows.lnk"
+    set ShortcutToDir=%AppData%\Microsoft\Windows\Start Menu\Programs\brows
 ) else (
-    set ShortcutFromPath="%THIS_DIR%startmenu\system\Browsers.lnk"
-    set ShortcutToDir=%ALLUSERSPROFILE%\Microsoft\Windows\Start Menu\Programs\Browsers
+    set ShortcutFromPath="%THIS_DIR%startmenu\system\brows.lnk"
+    set ShortcutToDir=%ALLUSERSPROFILE%\Microsoft\Windows\Start Menu\Programs\brows
 )
 
 if not exist "%ShortcutToDir%\" (
   mkdir "%ShortcutToDir%" || exit /b
 )
 
-set ShortcutToPath=%ShortcutToDir%\Browsers.lnk
+set ShortcutToPath=%ShortcutToDir%\brows.lnk
 copy "%ShortcutFromPath%" "%ShortcutToPath%" 1>nul
 
 if %is_local_install% == true (
@@ -144,52 +144,52 @@ if %is_local_install% == true (
     set RegistryRoot=HKLM
 )
 
-REG ADD "%RegistryRoot%\Software\Classes\software.Browsers" /ve /d "Browsers HTML Document" /f 1>nul
-REG ADD "%RegistryRoot%\Software\Classes\software.Browsers" /v AppUserModelId /t REG_SZ /d "software.Browsers" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Classes\me.tarik02.brows" /ve /d "brows HTML Document" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Classes\me.tarik02.brows" /v AppUserModelId /t REG_SZ /d "me.tarik02.brows" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Classes\software.Browsers\Application" /v AppUserModelId /t REG_SZ /d "software.Browsers" /f 1>nul
-REG ADD "%RegistryRoot%\Software\Classes\software.Browsers\Application" /v ApplicationIcon /t REG_SZ /d "%ProgramDir%\browsers.exe,0" /f 1>nul
-REG ADD "%RegistryRoot%\Software\Classes\software.Browsers\Application" /v ApplicationName /t REG_SZ /d "Browsers" /f 1>nul
-REG ADD "%RegistryRoot%\Software\Classes\software.Browsers\Application" /v ApplicationDescription /t REG_SZ /d "Open the right browser at the right time" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Classes\me.tarik02.brows\Application" /v AppUserModelId /t REG_SZ /d "me.tarik02.brows" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Classes\me.tarik02.brows\Application" /v ApplicationIcon /t REG_SZ /d "%ProgramDir%\brows.exe,0" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Classes\me.tarik02.brows\Application" /v ApplicationName /t REG_SZ /d "brows" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Classes\me.tarik02.brows\Application" /v ApplicationDescription /t REG_SZ /d "Open the right browser at the right time" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Classes\software.Browsers\DefaultIcon" /ve /d "%ProgramDir%\browsers.exe,0" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Classes\me.tarik02.brows\DefaultIcon" /ve /d "%ProgramDir%\brows.exe,0" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Classes\software.Browsers\shell\open\command" /ve /d "\"%ProgramDir%\browsers.exe\" \"%%1\"" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Classes\me.tarik02.brows\shell\open\command" /ve /d "\"%ProgramDir%\brows.exe\" \"%%1\"" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\software.Browsers" /ve /d "Browsers" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\me.tarik02.brows" /ve /d "brows" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\software.Browsers\Capabilities" /v ApplicationIcon /t REG_SZ /d "%ProgramDir%\browsers.exe,0" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\me.tarik02.brows\Capabilities" /v ApplicationIcon /t REG_SZ /d "%ProgramDir%\brows.exe,0" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\software.Browsers\Capabilities" /v ApplicationName /t REG_SZ /d "Browsers" /f 1>nul
-REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\software.Browsers\Capabilities" /v ApplicationDescription /t REG_SZ /d "Open the right browser at the right time" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\me.tarik02.brows\Capabilities" /v ApplicationName /t REG_SZ /d "brows" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\me.tarik02.brows\Capabilities" /v ApplicationDescription /t REG_SZ /d "Open the right browser at the right time" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\software.Browsers\Capabilities\URLAssociations" /v http /t REG_SZ /d "software.Browsers" /f 1>nul
-REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\software.Browsers\Capabilities\URLAssociations" /v https /t REG_SZ /d "software.Browsers" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\me.tarik02.brows\Capabilities\URLAssociations" /v http /t REG_SZ /d "me.tarik02.brows" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\me.tarik02.brows\Capabilities\URLAssociations" /v https /t REG_SZ /d "me.tarik02.brows" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\software.Browsers\DefaultIcon" /ve /d "%ProgramDir%\browsers.exe,0" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\me.tarik02.brows\DefaultIcon" /ve /d "%ProgramDir%\brows.exe,0" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\software.Browsers\shell\open\command" /ve /d "\"%ProgramDir%\browsers.exe\"" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Clients\StartMenuInternet\me.tarik02.brows\shell\open\command" /ve /d "\"%ProgramDir%\brows.exe\"" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\RegisteredApplications" /v software.Browsers /t REG_SZ /d "Software\Clients\StartMenuInternet\software.Browsers\Capabilities" /f 1>nul
+REG ADD "%RegistryRoot%\Software\RegisteredApplications" /v me.tarik02.brows /t REG_SZ /d "Software\Clients\StartMenuInternet\me.tarik02.brows\Capabilities" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\App Paths\browsers.exe" /ve /d "%ProgramDir%\browsers.exe" /f 1>nul
-REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\App Paths\browsers.exe" /v Path /t REG_SZ /d "%ProgramDir%" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\App Paths\brows.exe" /ve /d "%ProgramDir%\brows.exe" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\App Paths\brows.exe" /v Path /t REG_SZ /d "%ProgramDir%" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\App Paths\browsers.exe\SupportedProtocols" /v http /t REG_SZ /d "" /f 1>nul
-REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\App Paths\browsers.exe\SupportedProtocols" /v https /t REG_SZ /d "" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\App Paths\brows.exe\SupportedProtocols" /v http /t REG_SZ /d "" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\App Paths\brows.exe\SupportedProtocols" /v https /t REG_SZ /d "" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\software.Browsers" /f 1>nul
-REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\software.Browsers" /v DisplayIcon /t REG_SZ /d "%ProgramDir%\browsers.exe" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\me.tarik02.brows" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\me.tarik02.brows" /v DisplayIcon /t REG_SZ /d "%ProgramDir%\brows.exe" /f 1>nul
 
-REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\software.Browsers" /v DisplayVersion /t REG_SZ /d "%APP_VERSION%" /f 1>nul
-REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\software.Browsers" /v EstimatedSize /t REG_DWORD /d 4800 /f 1>nul
+REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\me.tarik02.brows" /v DisplayVersion /t REG_SZ /d "%APP_VERSION%" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\me.tarik02.brows" /v EstimatedSize /t REG_DWORD /d 4800 /f 1>nul
 
 if %is_local_install% == true (
-  REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\software.Browsers" /v DisplayName /t REG_SZ /d "Browsers (Current User)" /f 1>nul
-  REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\software.Browsers" /v UninstallString /t REG_SZ /d "\"%ProgramDir%\uninstall.bat\" --user" /f 1>nul
+  REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\me.tarik02.brows" /v DisplayName /t REG_SZ /d "brows (Current User)" /f 1>nul
+  REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\me.tarik02.brows" /v UninstallString /t REG_SZ /d "\"%ProgramDir%\uninstall.bat\" --user" /f 1>nul
 ) else (
-  REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\software.Browsers" /v DisplayName /t REG_SZ /d "Browsers (All Users)" /f 1>nul
-  REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\software.Browsers" /v UninstallString /t REG_SZ /d "\"%ProgramDir%\uninstall.bat\" --system" /f 1>nul
+  REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\me.tarik02.brows" /v DisplayName /t REG_SZ /d "brows (All Users)" /f 1>nul
+  REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\me.tarik02.brows" /v UninstallString /t REG_SZ /d "\"%ProgramDir%\uninstall.bat\" --system" /f 1>nul
 )
 
 if %is_local_install% == true (
@@ -197,12 +197,12 @@ if %is_local_install% == true (
 ) else (
     set UninstallParameter=--system
 )
-REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\software.Browsers" /v UninstallString /t REG_SZ /d "\"%ProgramDir%\uninstall.bat\" %UninstallParameter%" /f 1>nul
+REG ADD "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\me.tarik02.brows" /v UninstallString /t REG_SZ /d "\"%ProgramDir%\uninstall.bat\" %UninstallParameter%" /f 1>nul
 
 powershell -ExecutionPolicy Bypass -File "%THIS_DIR%announce_default.ps1" || exit /b
 
-echo Browsers has been installed. Enjoy!
-echo Please report any issues at https://github.com/tarik02-org/browsers-gpui/issues
+echo brows has been installed. Enjoy!
+echo Please report any issues at https://github.com/tarik02-org/brows/issues
 
 if not %is_silent% == true (
     echo You can now press Enter to exit this installer.
