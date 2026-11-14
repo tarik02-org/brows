@@ -10,12 +10,12 @@ use tracing_subscriber;
 use tracing_subscriber::fmt::time::OffsetTime;
 use tracing_subscriber::fmt::writer::MakeWriterExt;
 
-use browsers::utils::OSAppFinder;
-use browsers::{
+use brows::utils::OSAppFinder;
+use brows::{
     MessageToMain, UrlOpenContext, generate_all_browser_profiles, get_opening_rules,
     open_link_if_matching_rule, prepare_ui, unwrap_url, utils,
 };
-use browsers::{handle_messages_to_main, paths};
+use brows::{handle_messages_to_main, paths};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -30,24 +30,24 @@ fn main() {
 
     #[cfg(target_os = "linux")]
     if !is_daemon && !no_gui {
-        let request = browsers::communicate::DaemonRequest {
+        let request = brows::communicate::DaemonRequest {
             url: requested_url.clone(),
             reload: force_reload,
             activation_token: env::var("XDG_ACTIVATION_TOKEN")
                 .ok()
                 .filter(|token| !token.is_empty()),
         };
-        match browsers::communicate::activate(&request) {
+        match brows::communicate::activate(&request) {
             Ok(()) => return,
             Err(error) => {
-                eprintln!("Could not activate Browsers over D-Bus, opening directly: {error}");
+                eprintln!("Could not activate brows over D-Bus, opening directly: {error}");
             }
         }
     }
 
     #[cfg(not(target_os = "linux"))]
     if is_daemon {
-        eprintln!("Browsers daemon is currently supported only on Linux");
+        eprintln!("brows daemon is currently supported only on Linux");
         return;
     }
 
@@ -63,7 +63,7 @@ fn main() {
     let logs_root_dir = paths::get_logs_root_dir();
     fs::create_dir_all(logs_root_dir.as_path()).unwrap();
 
-    let log_file_path = logs_root_dir.join("browsers.log");
+    let log_file_path = logs_root_dir.join("brows.log");
     let file_appender = BasicRollingFileAppender::new(
         log_file_path.as_path(),
         RollingConditionBasic::new().daily(),
@@ -71,10 +71,10 @@ fn main() {
     )
     .unwrap();
 
-    //let file_appender = tracing_appender::rolling::daily(logs_root_dir, "browsers.log");
+    //let file_appender = tracing_appender::rolling::daily(logs_root_dir, "brows.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-    let log_level = env::var("BROWSERS_LOG_LEVEL")
+    let log_level = env::var("BROWS_LOG_LEVEL")
         .ok()
         .and_then(|level| Level::from_str(&level).ok())
         .unwrap_or(Level::INFO);
@@ -91,7 +91,7 @@ fn main() {
         .with_ansi(false)
         .init();
 
-    info!("Starting Browsers");
+    info!("Starting brows");
     info!("Logging to {}", log_file_path.display());
 
     let show_gui = is_daemon || !no_gui;
@@ -105,20 +105,22 @@ fn main() {
 
     #[cfg(target_os = "linux")]
     let _application_service = if is_daemon {
-        match browsers::communicate::start_application_service(main_sender.clone()) {
+        match brows::communicate::start_application_service(main_sender.clone()) {
             Ok(connection) => Some(connection),
             Err(zbus::Error::NameTaken) => {
-                info!("Browsers daemon is already running");
+                info!("brows daemon is already running");
                 return;
             }
             Err(error) => {
-                eprintln!("Could not start Browsers daemon: {error}");
+                eprintln!("Could not start brows daemon: {error}");
                 return;
             }
         }
     } else {
         None
     };
+
+    paths::migrate_legacy_config();
 
     let app_finder = OSAppFinder::new();
     let config = app_finder.load_config();
@@ -180,5 +182,5 @@ fn main() {
     });
 
     let persistent = is_daemon || cfg!(target_os = "macos");
-    browsers::gui::app::run(ui_state, main_sender, ui_receiver, persistent);
+    brows::gui::app::run(ui_state, main_sender, ui_receiver, persistent);
 }

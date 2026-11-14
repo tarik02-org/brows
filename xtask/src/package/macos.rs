@@ -21,15 +21,15 @@ pub fn package(repo_root: &Path, skip_build: bool) -> Result<()> {
     create_dmg(repo_root, &release_dir)?;
     create_archive(
         &release_dir,
-        "browsers_mac.tar.gz",
+        "brows_mac.tar.gz",
         ArchiveCompression::Gzip,
-        &["Browsers.app"],
+        &["brows.app"],
     )?;
     create_archive(
         &release_dir,
-        "browsers_mac.tar.xz",
+        "brows_mac.tar.xz",
         ArchiveCompression::Xz,
-        &["Browsers.app"],
+        &["brows.app"],
     )
 }
 
@@ -51,27 +51,27 @@ fn assemble_binary(repo_root: &Path, release_dir: &Path) -> Result<()> {
     let mut command = Command::new("lipo");
     command
         .args(["-create", "-output"])
-        .arg(release_dir.join("Browsers"))
-        .arg(repo_root.join("target/x86_64-apple-darwin/release/browsers"))
-        .arg(repo_root.join("target/aarch64-apple-darwin/release/browsers"))
+        .arg(release_dir.join("brows"))
+        .arg(repo_root.join("target/x86_64-apple-darwin/release/brows"))
+        .arg(repo_root.join("target/aarch64-apple-darwin/release/brows"))
         .current_dir(repo_root);
     run_command(&mut command)?;
-    make_executable(&release_dir.join("Browsers"))
+    make_executable(&release_dir.join("brows"))
 }
 
 fn assemble_app(repo_root: &Path, release_dir: &Path) -> Result<()> {
-    let contents = release_dir.join("Browsers.app/Contents");
+    let contents = release_dir.join("brows.app/Contents");
     copy_file(
         &repo_root.join("target/universal-apple-darwin/meta/Info.plist"),
         &contents.join("Info.plist"),
     )?;
     copy_file(
-        &repo_root.join("extra/macos/icons/Browsers.icns"),
-        &contents.join("Resources/Browsers.icns"),
+        &repo_root.join("extra/macos/icons/brows.icns"),
+        &contents.join("Resources/brows.icns"),
     )?;
     copy_file(
-        &repo_root.join("resources/icons/512x512/software.Browsers.png"),
-        &contents.join("Resources/icons/512x512/software.Browsers.png"),
+        &repo_root.join("resources/icons/512x512/me.tarik02.brows.png"),
+        &contents.join("Resources/icons/512x512/me.tarik02.brows.png"),
     )?;
     copy_file(
         &repo_root.join("resources/i18n/en-US/builtin.ftl"),
@@ -81,19 +81,16 @@ fn assemble_app(repo_root: &Path, release_dir: &Path) -> Result<()> {
         &repo_root.join("resources/repository/application-repository.toml"),
         &contents.join("Resources/repository/application-repository.toml"),
     )?;
-    copy_file(&release_dir.join("Browsers"), &contents.join("MacOS/Browsers"))
+    copy_file(&release_dir.join("brows"), &contents.join("MacOS/brows"))
 }
 
 fn create_dmg(repo_root: &Path, release_dir: &Path) -> Result<()> {
     let source_assets = repo_root.join("extra/macos/dmg/dmg_source");
-    let working_dir = repo_root.join("target/packaging/macos/Browsers");
+    let working_dir = repo_root.join("target/packaging/macos/brows");
     reset_dir(&working_dir)?;
     std::fs::create_dir_all(working_dir.join(".background"))?;
 
-    copy_dir(
-        &release_dir.join("Browsers.app"),
-        &working_dir.join("Browsers.app"),
-    )?;
+    copy_dir(&release_dir.join("brows.app"), &working_dir.join("brows.app"))?;
     copy_file(
         &source_assets.join(".VolumeIcon.icns"),
         &working_dir.join(".VolumeIcon.icns"),
@@ -101,11 +98,11 @@ fn create_dmg(repo_root: &Path, release_dir: &Path) -> Result<()> {
     copy_file(&source_assets.join(".DS_Store"), &working_dir.join(".DS_Store"))?;
     create_symlink(Path::new("/Applications"), &working_dir.join("Applications"))?;
 
-    let dmg = release_dir.join("Browsers.dmg");
+    let dmg = release_dir.join("brows.dmg");
     remove_file(&dmg)?;
     let mut hdiutil = Command::new("hdiutil");
     hdiutil
-        .args(["create", "-volname", "Browsers", "-srcfolder"])
+        .args(["create", "-volname", "brows", "-srcfolder"])
         .arg(&working_dir)
         .arg("-ov")
         .arg(&dmg)

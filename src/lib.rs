@@ -901,8 +901,8 @@ pub fn handle_messages_to_main(
                 app_finder.save_config(&config);
 
                 // refresh opening rules immediately
-                // so that if same Browsers instance stays open,
-                // it will already work with the new rule without restarting Browsers
+                // so that if same brows instance stays open,
+                // it will already work with the new rule without restarting brows
                 opening_rules_and_default_profile.opening_rules = to_opening_rules(&new_rules);
             }
             MessageToMain::SaveConfigDefaultOpener(default_opener) => {
@@ -917,8 +917,8 @@ pub fn handle_messages_to_main(
                 app_finder.save_config(&config);
 
                 // refresh default opener immediately
-                // so that if same Browsers instance stays open,
-                // it will already work with the new rule without restarting Browsers
+                // so that if same brows instance stays open,
+                // it will already work with the new rule without restarting brows
                 opening_rules_and_default_profile.default_profile = new_default_profile.clone();
             }
             MessageToMain::SaveConfigUISettings(settings) => {

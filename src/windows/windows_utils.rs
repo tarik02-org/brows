@@ -223,7 +223,7 @@ impl OsHelper {
     ) -> Option<InstalledBrowser> {
         let display_name = app_info.name.to_string();
 
-        if app_info.registry_key == "software.Browsers" {
+        if app_info.registry_key == "me.tarik02.brows" {
             // this is us, skip
             return None;
         }
@@ -446,42 +446,51 @@ unsafe fn convert_icon_to_image(icon: HICON) -> RgbaImage {
 }
 
 // PATHS
-const APP_DIR_NAME: &'static str = "software.Browsers";
-const APP_BUNDLE_ID: &'static str = "software.Browsers";
+const APP_DIR_NAME: &'static str = "me.tarik02.brows";
+const APP_BUNDLE_ID: &'static str = "me.tarik02.brows";
+// Data directory name used before the rename to brows.
+const LEGACY_APP_DIR_NAME: &'static str = "software.Browsers";
 
-// C:\Users\Alice\AppData\Local\software.Browsers\cache\runtime
+// C:\Users\Alice\AppData\Local\me.tarik02.brows\cache\runtime
 pub fn get_this_app_runtime_dir() -> PathBuf {
     return get_this_app_cache_root_dir().join("runtime");
 }
 
-// C:\Users\Alice\AppData\Local\software.Browsers\cache
+// C:\Users\Alice\AppData\Local\me.tarik02.brows\cache
 pub fn get_this_app_cache_root_dir() -> PathBuf {
     return get_this_app_config_local_dir().join("cache");
 }
 
-// C:\Users\Alice\AppData\Local\software.Browsers\logs
+// C:\Users\Alice\AppData\Local\me.tarik02.brows\logs
 pub fn get_this_app_logs_root_dir() -> PathBuf {
     return get_this_app_config_local_dir().join("logs");
 }
 
-// C:\Users\Alice\AppData\Local\software.Browsers\config
+// C:\Users\Alice\AppData\Local\me.tarik02.brows\config
 pub fn get_this_app_config_root_dir() -> PathBuf {
     return get_this_app_config_local_dir().join("config");
 }
 
+// C:\Users\Alice\AppData\Local\software.Browsers\config
+pub fn get_legacy_app_config_root_dir() -> PathBuf {
+    return get_config_local_dir()
+        .join(LEGACY_APP_DIR_NAME)
+        .join("config");
+}
+
 // For resources (e.g translations)
-// C:\Users\Alice\AppData\Local\Programs\software.Browsers\resources
-// %ProgramFiles%\software.Browsers\resources
+// C:\Users\Alice\AppData\Local\Programs\me.tarik02.brows\resources
+// %ProgramFiles%\me.tarik02.brows\resources
 pub fn get_this_app_resources_dir() -> PathBuf {
     return get_this_app_program_dir().join("resources");
 }
 
-// C:\Users\Alice\AppData\Local\Programs\software.Browsers\
-// %LocalAppData%\Programs\software.Browsers\
-// %ProgramFiles%\software.Browsers\
+// C:\Users\Alice\AppData\Local\Programs\me.tarik02.brows\
+// %LocalAppData%\Programs\me.tarik02.brows\
+// %ProgramFiles%\me.tarik02.brows\
 fn get_this_app_program_dir() -> PathBuf {
-    // %LocalAppData%\Programs\software.Browsers\browsers.exe
-    // %ProgramFiles%\software.Browsers\browsers.exe
+    // %LocalAppData%\Programs\me.tarik02.brows\brows.exe
+    // %ProgramFiles%\me.tarik02.brows\brows.exe
     let binary_file_path =
         dunce::canonicalize(std::env::current_exe().expect("Can't find current executable"))
             .expect("Can't canonicalize current executable path");
@@ -490,7 +499,7 @@ fn get_this_app_program_dir() -> PathBuf {
     return binary_dir_path.to_path_buf();
 }
 
-// C:\Users\Alice\AppData\Local\software.Browsers
+// C:\Users\Alice\AppData\Local\me.tarik02.brows
 fn get_this_app_config_local_dir() -> PathBuf {
     return get_config_local_dir().join(APP_DIR_NAME);
 }

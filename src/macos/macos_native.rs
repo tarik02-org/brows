@@ -1,95 +1,130 @@
-use gpui::{Bounds, Pixels, Point, point, px, size};
-use objc2::rc::Retained;
-use objc2::runtime::AnyObject;
-use objc2::{AnyThread, MainThreadMarker, class, msg_send};
+use objc2::rc::{Retained, autoreleasepool};
+use objc2::runtime::{AnyClass, AnyObject, ClassBuilder, NSObject, Sel};
+use objc2::{AnyThread, ClassType, MainThreadMarker, class, msg_send, sel};
 use std::collections::HashSet;
+use std::ffi::CStr;
 use std::ops::Deref;
 use std::path::PathBuf;
+use std::sync::OnceLock;
+use std::sync::mpsc::Sender;
 
 use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSEvent, NSScreen, NSWorkspace};
 use objc2_foundation::{
     NSArray, NSBundle, NSDictionary, NSNumber, NSPoint, NSRect, NSSearchPathDirectory,
     NSSearchPathDomainMask, NSSearchPathForDirectoriesInDomains, NSSize, NSString,
 };
-use tracing::debug;
+use tracing::{debug, warn};
 
-pub fn cursor_position() -> Option<(u64, Point<Pixels>, Bounds<Pixels>)> {
-    let main_thread = MainThreadMarker::new()?;
-    let cursor = NSEvent::mouseLocation();
+use crate::MessageToMain;
 
-    for screen in NSScreen::screens(main_thread).iter() {
-        let frame = screen.frame();
-        if cursor.x < frame.origin.x
-            || cursor.x >= frame.origin.x + frame.size.width
-            || cursor.y < frame.origin.y
-            || cursor.y >= frame.origin.y + frame.size.height
-        {
-            continue;
-        }
+/// Receives the get-URL Apple Events that open links with brows and forwards each link with
+/// the bundle id of the app that sent it. Rune's `on_open_url` hook runs after the event is
+/// dispatched, when the sender can no longer be read. Install it on the main thread before the
+/// event loop starts, so the link that launched brows arrives here too; Rune leaves a handler
+/// installed before its loop alone.
+pub fn install_open_url_handler(main_sender: Sender<MessageToMain>) {
+    const NAME: &CStr = c"BrowsOpenUrlHandler";
 
-        let description = screen.deviceDescription();
-        let display_id_key = NSString::from_str("NSScreenNumber");
-        let display_id = description
-            .objectForKey(&display_id_key)?
-            .downcast::<NSNumber>()
-            .ok()?
-            .as_u64();
-
-        let visible_frame = screen.visibleFrame();
-        let cursor = point(
-            px((cursor.x - frame.origin.x) as f32),
-            px((frame.origin.y + frame.size.height - cursor.y) as f32),
-        );
-        let visible_bounds = Bounds::new(
-            point(
-                px((visible_frame.origin.x - frame.origin.x) as f32),
-                px((frame.origin.y + frame.size.height
-                    - visible_frame.origin.y
-                    - visible_frame.size.height) as f32),
-            ),
-            size(
-                px(visible_frame.size.width as f32),
-                px(visible_frame.size.height as f32),
-            ),
-        );
-
-        return Some((display_id, cursor, visible_bounds));
+    if MainThreadMarker::new().is_none() {
+        warn!("Could not install the open-URL handler off the main thread");
+        return;
+    }
+    if OPEN_URL_SENDER.set(main_sender).is_err() {
+        return;
     }
 
-    None
+    let class = AnyClass::get(NAME).or_else(|| {
+        let mut builder = ClassBuilder::new(NAME, NSObject::class())?;
+        // SAFETY: `handle_get_url_event` matches `handleGetURLEvent:withReplyEvent:`.
+        unsafe {
+            builder.add_method(
+                sel!(handleGetURLEvent:withReplyEvent:),
+                handle_get_url_event as extern "C" fn(_, _, _, _),
+            );
+        }
+        Some(builder.register())
+    });
+    let Some(class) = class else {
+        warn!("Could not register {NAME:?}");
+        return;
+    };
+
+    // SAFETY: Foundation calls on the main thread. The event manager doesn't retain its
+    // handler, so the handler is never released.
+    unsafe {
+        let handler: *mut AnyObject = msg_send![class, new];
+        let manager: *mut AnyObject =
+            msg_send![class!(NSAppleEventManager), sharedAppleEventManager];
+        let Some(manager) = manager.as_ref() else {
+            warn!("Could not reach NSAppleEventManager");
+            return;
+        };
+        let _: () = msg_send![
+            manager,
+            setEventHandler: handler,
+            andSelector: sel!(handleGetURLEvent:withReplyEvent:),
+            forEventClass: GET_URL_EVENT,
+            andEventID: GET_URL_EVENT
+        ];
+    }
 }
 
-/// Bundle id of the app that sent the Apple Event AppKit is currently dispatching.
-///
-/// Only meaningful during event dispatch, e.g. inside `application:openURLs:`,
-/// which GPUI forwards synchronously to `on_open_urls`.
-pub fn current_apple_event_sender_bundle_id() -> Option<String> {
+/// `'GURL'`: `kInternetEventClass` and `kAEGetURL`.
+const GET_URL_EVENT: u32 = u32::from_be_bytes(*b"GURL");
+
+static OPEN_URL_SENDER: OnceLock<Sender<MessageToMain>> = OnceLock::new();
+
+extern "C" fn handle_get_url_event(
+    _: &AnyObject,
+    _: Sel,
+    event: *mut AnyObject,
+    _reply: *mut AnyObject,
+) {
+    let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        // SAFETY: AppKit passes the event being dispatched, or nil.
+        let Some(event) = (unsafe { event.as_ref() }) else {
+            return;
+        };
+        let Some(url) = apple_event_url(event) else {
+            warn!("Received a get-URL event without a URL");
+            return;
+        };
+        let source_bundle_id = apple_event_sender_bundle_id(event).unwrap_or_default();
+        if let Some(sender) = OPEN_URL_SENDER.get() {
+            sender
+                .send(MessageToMain::UrlOpenRequest(source_bundle_id, url, None))
+                .ok();
+        }
+    }));
+    if caught.is_err() {
+        warn!("Open-URL handler panicked");
+    }
+}
+
+fn apple_event_url(event: &AnyObject) -> Option<String> {
+    const DIRECT_OBJECT: u32 = u32::from_be_bytes(*b"----");
+
+    // SAFETY: `event` is an NSAppleEventDescriptor; both messages are nil-safe.
+    autoreleasepool(|_| unsafe {
+        let param: *mut AnyObject = msg_send![event, paramDescriptorForKeyword: DIRECT_OBJECT];
+        let url: *mut NSString = msg_send![param.as_ref()?, stringValue];
+        Some(url.as_ref()?.to_string())
+    })
+}
+
+fn apple_event_sender_bundle_id(event: &AnyObject) -> Option<String> {
     const KEY_ADDRESS_ATTR: u32 = u32::from_be_bytes(*b"addr");
     const TYPE_APPLICATION_BUNDLE_ID: u32 = u32::from_be_bytes(*b"bund");
 
-    unsafe {
-        let manager: *mut AnyObject =
-            msg_send![class!(NSAppleEventManager), sharedAppleEventManager];
-        let event: *mut AnyObject = msg_send![manager, currentAppleEvent];
-        if event.is_null() {
-            return None;
-        }
+    // SAFETY: `event` is an NSAppleEventDescriptor; every message is nil-safe.
+    autoreleasepool(|_| unsafe {
         let sender: *mut AnyObject =
             msg_send![event, attributeDescriptorForKeyword: KEY_ADDRESS_ATTR];
-        if sender.is_null() {
-            return None;
-        }
         let bundle_id: *mut AnyObject =
-            msg_send![sender, coerceToDescriptorType: TYPE_APPLICATION_BUNDLE_ID];
-        if bundle_id.is_null() {
-            return None;
-        }
-        let bundle_id: *mut NSString = msg_send![bundle_id, stringValue];
-        bundle_id
-            .as_ref()
-            .map(|bundle_id| bundle_id.to_string())
-            .filter(|bundle_id| !bundle_id.is_empty())
-    }
+            msg_send![sender.as_ref()?, coerceToDescriptorType: TYPE_APPLICATION_BUNDLE_ID];
+        let bundle_id: *mut NSString = msg_send![bundle_id.as_ref()?, stringValue];
+        Some(bundle_id.as_ref()?.to_string()).filter(|bundle_id| !bundle_id.is_empty())
+    })
 }
 
 pub fn create_icon_for_app(full_path: &NSString, icon_path: &str) {
@@ -228,7 +263,7 @@ pub fn get_bundle_ids_for_url_scheme(scheme: &str) -> Vec<String> {
 }
 
 pub fn set_default_web_browser() -> bool {
-    let bundle_id = "software.Browsers";
+    let bundle_id = "me.tarik02.brows";
     let bundle_id = NSString::from_str(bundle_id);
     let bundle_id = bundle_id.deref();
 
@@ -247,7 +282,7 @@ pub fn set_default_web_browser() -> bool {
 }
 
 pub fn is_default_web_browser() -> bool {
-    let bundle_id = "software.Browsers";
+    let bundle_id = "me.tarik02.brows";
     //let bundle_id = NSString::from_str(bundle_id);
     //let bundle_id = bundle_id.deref();
 

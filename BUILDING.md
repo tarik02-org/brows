@@ -1,3 +1,6 @@
+`rust-toolchain.toml` pins Rust 1.99.1, which Rune requires; rustup installs it
+automatically.
+
 # Build macOS packages
 
     rustup target add x86_64-apple-darwin
@@ -10,7 +13,7 @@
 ## Nix / NixOS
 
 The repository includes a development shell with the Rust toolchain and all
-GPUI native dependencies:
+native dependencies:
 
     nix develop
     cargo build --release
@@ -23,8 +26,7 @@ application repository, translations, desktop entry, and icons):
 
 To install it into a Nix profile, use `nix profile install .`. The package is
 available as `packages.default`; the same derivation can be consumed from
-another flake through `inputs.browsers-gpui.overlays.default` as
-`pkgs.browsers-gpui`.
+another flake through `inputs.brows.overlays.default` as `pkgs.brows`.
 
 ## Setup (e.g Ubuntu)
 
@@ -44,8 +46,9 @@ another flake through `inputs.browsers-gpui.overlays.default` as
 
     cargo build --release
 
-GPUI uses Vulkan on Linux. A working Vulkan driver is required when running
-the application; both X11 and Wayland backends are enabled by default.
+Rune renders through wgpu, which uses Vulkan on Linux. A working Vulkan driver
+is required when running the application; both X11 and Wayland backends are
+enabled by default.
 
 ## Regenerate the README screenshots
 

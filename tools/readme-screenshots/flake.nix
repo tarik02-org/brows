@@ -1,5 +1,5 @@
 {
-  description = "Development tool for capturing Browsers README screenshots";
+  description = "Development tool for capturing brows README screenshots";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/f13ff45afd1bb73e640eaa08a7066dbed07e3238";
@@ -48,15 +48,15 @@
               pkgs.xdg-utils
             ];
             text = ''
-              export BROWSERS_CAPTURE_WRAPPED=1
-              export BROWSERS_CAPTURE_ASSET_DIR=${./.}
-              export BROWSERS_CAPTURE_DEJAVU_FONT_DIR=${pkgs.dejavu_fonts}/share/fonts/truetype
-              export BROWSERS_CAPTURE_INTER_FONT_DIR=${pkgs.inter}/share/fonts
-              export BROWSERS_CAPTURE_HEADLESSDESK_SHARE=${headlessdeskPackage}/share
-              export BROWSERS_CAPTURE_ICON_DIR=${pkgs.papirus-icon-theme}/share/icons/Papirus/64x64/apps
-              export BROWSERS_CAPTURE_MESA=${pkgs.mesa}
-              export BROWSERS_CAPTURE_SPECTACLE_SHARE=${pkgs.kdePackages.spectacle}/share
-              export BROWSERS_CAPTURE_VK_DRIVER=${pkgs.mesa}/share/vulkan/icd.d/lvp_icd.${vulkanArch}.json
+              export BROWS_CAPTURE_WRAPPED=1
+              export BROWS_CAPTURE_ASSET_DIR=${./.}
+              export BROWS_CAPTURE_DEJAVU_FONT_DIR=${pkgs.dejavu_fonts}/share/fonts/truetype
+              export BROWS_CAPTURE_INTER_FONT_DIR=${pkgs.inter}/share/fonts
+              export BROWS_CAPTURE_HEADLESSDESK_SHARE=${headlessdeskPackage}/share
+              export BROWS_CAPTURE_ICON_DIR=${pkgs.papirus-icon-theme}/share/icons/Papirus/64x64/apps
+              export BROWS_CAPTURE_MESA=${pkgs.mesa}
+              export BROWS_CAPTURE_SPECTACLE_SHARE=${pkgs.kdePackages.spectacle}/share
+              export BROWS_CAPTURE_VK_DRIVER=${pkgs.mesa}/share/vulkan/icd.d/lvp_icd.${vulkanArch}.json
 
               ${builtins.readFile ./capture.sh}
             '';

@@ -1,11 +1,11 @@
 [package]
-name = "browsers"
+name = "brows"
 version = "2026.8.1400"
 authors = ["Madis Liias <madisliias@gmail.com>"]
 edition = "2024"
-description = "Browsers"
-homepage = "https://github.com/tarik02-org/browsers-gpui"
-repository = "https://github.com/tarik02-org/browsers-gpui"
+description = "brows"
+homepage = "https://github.com/tarik02-org/brows"
+repository = "https://github.com/tarik02-org/brows"
 license = "MIT OR Apache-2.0"
 build = "build.rs"
 
@@ -28,12 +28,10 @@ toml = "1.0.0"
 serde_json = "1.0.145"
 serde = { version = "1.0.228", features = ["derive"] }
 
-# GPU-accelerated UI and component library. gpui-component tracks Zed's
-# unpublished GPUI APIs, so Cargo.lock pins both repositories.
-gpui = { git = "https://github.com/zed-industries/zed" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "x11", "wayland", "runtime_shaders"] }
-gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "e12e39ca55051d02f0e2ae8a910a674905c722d6" }
-gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "e12e39ca55051d02f0e2ae8a910a674905c722d6" }
+# GPU-rendered UI. Rune is pre-release: apps pin a `dev` rev and patch the crates
+# Rune patches, from the same rev (see [patch.crates-io] below).
+rune = { git = "https://github.com/anomalyco/rune", rev = "4970cffe6a4e90c7d613796be8ce39eb3dcb281b" }
+rune-kit = { git = "https://github.com/anomalyco/rune", rev = "4970cffe6a4e90c7d613796be8ce39eb3dcb281b" }
 
 # Browser/profile icon decoding and cache generation.
 image = { version = "0.24.9", default-features = false, features = ["png", "jpeg"] }
@@ -71,6 +69,9 @@ objc2 = "0.6.1"
 libc = "0.2.154"
 
 [target.'cfg(target_os = "linux")'.dependencies]
+# Reads the pointer to open the picker beside it on X11
+x11rb = "0.13"
+
 xdg-mime = "^0.4.0"
 zbus = "5.19.0"
 
@@ -90,6 +91,7 @@ winapi = { version = "0.3.9", features = [
     "minwindef",
     "ntdef",
     "shellapi",
+    "shellscalingapi",
     "windef",
     "wingdi",
     "winuser",
@@ -110,11 +112,11 @@ winres = "0.1.12"
 # statically link vcruntime140.dll instead of requiring user to install the runtime
 static_vcruntime = "3.0"
 
-[patch."https://github.com/zed-industries/zed"]
-gpui = { git = "https://github.com/tarik02-org/zed", rev = "765f26b4414ed87dad9026cbdc34ad5188b02a15", version = "=0.2.2" }
-gpui_linux = { git = "https://github.com/tarik02-org/zed", rev = "765f26b4414ed87dad9026cbdc34ad5188b02a15", version = "=0.1.0" }
-gpui_macros = { git = "https://github.com/tarik02-org/zed", rev = "765f26b4414ed87dad9026cbdc34ad5188b02a15", version = "=0.1.0" }
-gpui_platform = { git = "https://github.com/tarik02-org/zed", rev = "765f26b4414ed87dad9026cbdc34ad5188b02a15", version = "=0.1.0" }
+[patch.crates-io]
+winit = { git = "https://github.com/anomalyco/rune", rev = "4970cffe6a4e90c7d613796be8ce39eb3dcb281b" }
+parley_engine = { git = "https://github.com/anomalyco/rune", rev = "4970cffe6a4e90c7d613796be8ce39eb3dcb281b" }
+wgpu-hal = { git = "https://github.com/anomalyco/rune", rev = "4970cffe6a4e90c7d613796be8ce39eb3dcb281b" }
+accesskit_windows = { git = "https://github.com/anomalyco/rune", rev = "4970cffe6a4e90c7d613796be8ce39eb3dcb281b" }
 
 #[profile.dev]
 #lto = true

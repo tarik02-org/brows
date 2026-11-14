@@ -3,8 +3,8 @@
 *.iml
 .DS_Store
 !extra/macos/dmg/dmg_source/.DS_Store
-extra/linux/dist/software.Browsers.desktop
-extra/linux/dist/xfce4/helpers/software.Browsers.desktop
+extra/linux/dist/me.tarik02.brows.desktop
+extra/linux/dist/xfce4/helpers/me.tarik02.brows.desktop
 .env
 /.fleet
 RELEASE_NOTES.md

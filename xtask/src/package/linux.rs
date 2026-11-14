@@ -33,20 +33,20 @@ const TARGETS: &[LinuxTarget] = &[
 ];
 
 const ARCHIVE_FILES: &[&str] = &[
-    "x86_64/browsers",
-    "aarch64/browsers",
-    "armv7l/browsers",
+    "x86_64/brows",
+    "aarch64/brows",
+    "armv7l/brows",
     "resources/i18n/en-US/builtin.ftl",
-    "resources/icons/16x16/software.Browsers.png",
-    "resources/icons/32x32/software.Browsers.png",
-    "resources/icons/64x64/software.Browsers.png",
-    "resources/icons/128x128/software.Browsers.png",
-    "resources/icons/256x256/software.Browsers.png",
-    "resources/icons/512x512/software.Browsers.png",
+    "resources/icons/16x16/me.tarik02.brows.png",
+    "resources/icons/32x32/me.tarik02.brows.png",
+    "resources/icons/64x64/me.tarik02.brows.png",
+    "resources/icons/128x128/me.tarik02.brows.png",
+    "resources/icons/256x256/me.tarik02.brows.png",
+    "resources/icons/512x512/me.tarik02.brows.png",
     "resources/repository/application-repository.toml",
-    "template/share/applications/software.Browsers.template.desktop",
-    "template/share/dbus-1/services/software.Browsers.service",
-    "template/share/xfce4/helpers/software.Browsers.template.desktop",
+    "template/share/applications/me.tarik02.brows.template.desktop",
+    "template/share/dbus-1/services/me.tarik02.brows.service",
+    "template/share/xfce4/helpers/me.tarik02.brows.template.desktop",
     "install.sh",
     "uninstall.sh",
 ];
@@ -61,13 +61,13 @@ pub fn package(repo_root: &Path, skip_build: bool) -> Result<()> {
     assemble_bundle(repo_root, &release_dir)?;
     create_archive(
         &release_dir,
-        "browsers_linux.tar.gz",
+        "brows_linux.tar.gz",
         ArchiveCompression::Gzip,
         ARCHIVE_FILES,
     )?;
     create_archive(
         &release_dir,
-        "browsers_linux.tar.xz",
+        "brows_linux.tar.xz",
         ArchiveCompression::Xz,
         ARCHIVE_FILES,
     )?;
@@ -94,10 +94,10 @@ fn assemble_binaries(repo_root: &Path, release_dir: &Path) -> Result<()> {
             &repo_root
                 .join("target")
                 .join(target.triple)
-                .join("release/browsers"),
-            &release_dir.join(target.output_dir).join("browsers"),
+                .join("release/brows"),
+            &release_dir.join(target.output_dir).join("brows"),
         )?;
-        make_executable(&release_dir.join(target.output_dir).join("browsers"))?;
+        make_executable(&release_dir.join(target.output_dir).join("brows"))?;
     }
     Ok(())
 }
@@ -113,7 +113,7 @@ fn assemble_bundle(repo_root: &Path, release_dir: &Path) -> Result<()> {
     )?;
 
     for size in ICON_SIZES {
-        let icon = format!("icons/{size}x{size}/software.Browsers.png");
+        let icon = format!("icons/{size}x{size}/me.tarik02.brows.png");
         copy_file(
             &repo_root.join("resources").join(&icon),
             &release_dir.join("resources").join(icon),
@@ -129,16 +129,16 @@ fn assemble_bundle(repo_root: &Path, release_dir: &Path) -> Result<()> {
         &release_dir.join("resources/repository/application-repository.toml"),
     )?;
     copy_file(
-        &repo_root.join("extra/linux/dist/software.Browsers.template.desktop"),
-        &release_dir.join("template/share/applications/software.Browsers.template.desktop"),
+        &repo_root.join("extra/linux/dist/me.tarik02.brows.template.desktop"),
+        &release_dir.join("template/share/applications/me.tarik02.brows.template.desktop"),
     )?;
     copy_file(
-        &repo_root.join("extra/linux/dist/software.Browsers.service"),
-        &release_dir.join("template/share/dbus-1/services/software.Browsers.service"),
+        &repo_root.join("extra/linux/dist/me.tarik02.brows.service"),
+        &release_dir.join("template/share/dbus-1/services/me.tarik02.brows.service"),
     )?;
     copy_file(
-        &repo_root.join("extra/linux/dist/xfce4/helpers/software.Browsers.template.desktop"),
-        &release_dir.join("template/share/xfce4/helpers/software.Browsers.template.desktop"),
+        &repo_root.join("extra/linux/dist/xfce4/helpers/me.tarik02.brows.template.desktop"),
+        &release_dir.join("template/share/xfce4/helpers/me.tarik02.brows.template.desktop"),
     )
 }
 
@@ -151,13 +151,13 @@ fn build_native_packages(repo_root: &Path, release_dir: &Path) -> Result<()> {
         build_deb(repo_root, &packaging_dir, &target_dir, target)?;
         build_rpm(repo_root, &packaging_dir, &target_dir, target)?;
 
-        let deb_filename = format!("browsers_{}.deb", target.deb_arch);
+        let deb_filename = format!("brows_{}.deb", target.deb_arch);
         copy_file(
             &target_dir.join("release").join(&deb_filename),
             &release_dir.join(target.output_dir).join(deb_filename),
         )?;
 
-        let rpm_filename = format!("browsers.{}.rpm", target.rpm_arch);
+        let rpm_filename = format!("brows.{}.rpm", target.rpm_arch);
         copy_file(
             &target_dir.join("release").join(&rpm_filename),
             &release_dir.join(target.output_dir).join(rpm_filename),
@@ -182,7 +182,7 @@ fn build_deb(
 
     let output = target_dir
         .join("release")
-        .join(format!("browsers_{}.deb", target.deb_arch));
+        .join(format!("brows_{}.deb", target.deb_arch));
     let mut command = Command::new("dpkg-deb");
     command
         .args(["-Zxz", "--root-owner-group", "--build"])
@@ -203,8 +203,8 @@ fn build_rpm(
         .join("rpmbuild");
     create_package_tree(repo_root, target_dir, &rpm_top.join("tree"))?;
 
-    let spec = rpm_top.join("SPECS/browsers.spec");
-    copy_file(&target_dir.join("meta/rpm_spec/browsers.spec"), &spec)?;
+    let spec = rpm_top.join("SPECS/brows.spec");
+    copy_file(&target_dir.join("meta/rpm_spec/brows.spec"), &spec)?;
 
     let mut command = Command::new("rpmbuild");
     command
@@ -216,7 +216,7 @@ fn build_rpm(
         .current_dir(repo_root);
     run_command(&mut command)?;
 
-    let filename = format!("browsers.{}.rpm", target.rpm_arch);
+    let filename = format!("brows.{}.rpm", target.rpm_arch);
     copy_file(
         &rpm_top.join("RPMS").join(&filename),
         &target_dir.join("release").join(filename),
@@ -228,50 +228,47 @@ fn create_package_tree(repo_root: &Path, target_dir: &Path, package_root: &Path)
 
     for size in ICON_SIZES {
         copy_file(
-            &repo_root.join(format!("resources/icons/{size}x{size}/software.Browsers.png")),
+            &repo_root.join(format!("resources/icons/{size}x{size}/me.tarik02.brows.png")),
             &package_root.join(format!(
-                "usr/share/icons/hicolor/{size}x{size}/apps/software.Browsers.png"
+                "usr/share/icons/hicolor/{size}x{size}/apps/me.tarik02.brows.png"
             )),
         )?;
     }
 
     render_template(
-        &repo_root.join("extra/linux/dist/software.Browsers.template.desktop"),
-        &package_root.join("usr/share/applications/software.Browsers.desktop"),
-        &[("€ExecCommand€", "/usr/bin/browsers %u")],
+        &repo_root.join("extra/linux/dist/me.tarik02.brows.template.desktop"),
+        &package_root.join("usr/share/applications/me.tarik02.brows.desktop"),
+        &[("€ExecCommand€", "/usr/bin/brows %u")],
     )?;
     render_template(
-        &repo_root.join("extra/linux/dist/software.Browsers.service"),
-        &package_root.join("usr/share/dbus-1/services/software.Browsers.service"),
-        &[("€ExecCommand€", "/usr/bin/browsers")],
+        &repo_root.join("extra/linux/dist/me.tarik02.brows.service"),
+        &package_root.join("usr/share/dbus-1/services/me.tarik02.brows.service"),
+        &[("€ExecCommand€", "/usr/bin/brows")],
     )?;
     render_template(
-        &repo_root.join("extra/linux/dist/xfce4/helpers/software.Browsers.template.desktop"),
-        &package_root.join("usr/share/applications/xfce4/helpers/software.Browsers.desktop"),
-        &[("€XFCEBinaries€", "browsers;/usr/bin/browsers;")],
+        &repo_root.join("extra/linux/dist/xfce4/helpers/me.tarik02.brows.template.desktop"),
+        &package_root.join("usr/share/applications/xfce4/helpers/me.tarik02.brows.desktop"),
+        &[("€XFCEBinaries€", "brows;/usr/bin/brows;")],
     )?;
 
-    let data_dir = package_root.join("usr/share/software.Browsers");
+    let data_dir = package_root.join("usr/share/me.tarik02.brows");
     copy_file(
         &repo_root.join("resources/i18n/en-US/builtin.ftl"),
         &data_dir.join("resources/i18n/en-US/builtin.ftl"),
     )?;
     copy_file(
-        &repo_root.join("resources/icons/512x512/software.Browsers.png"),
-        &data_dir.join("resources/icons/512x512/software.Browsers.png"),
+        &repo_root.join("resources/icons/512x512/me.tarik02.brows.png"),
+        &data_dir.join("resources/icons/512x512/me.tarik02.brows.png"),
     )?;
     copy_file(
         &repo_root.join("resources/repository/application-repository.toml"),
         &data_dir.join("resources/repository/application-repository.toml"),
     )?;
-    copy_file(
-        &target_dir.join("release/browsers"),
-        &data_dir.join("bin/browsers"),
-    )?;
-    make_executable(&data_dir.join("bin/browsers"))?;
+    copy_file(&target_dir.join("release/brows"), &data_dir.join("bin/brows"))?;
+    make_executable(&data_dir.join("bin/brows"))?;
     create_symlink(
-        Path::new("../share/software.Browsers/bin/browsers"),
-        &package_root.join("usr/bin/browsers"),
+        Path::new("../share/me.tarik02.brows/bin/brows"),
+        &package_root.join("usr/bin/brows"),
     )
 }
 

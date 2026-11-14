@@ -34,14 +34,14 @@ fn copy_resources() {
     let to_dir = target_build_path.as_path();
 
     copy_resource(to_dir, "i18n/en-US/builtin.ftl");
-    copy_resource(to_dir, "icons/512x512/software.Browsers.png");
+    copy_resource(to_dir, "icons/512x512/me.tarik02.brows.png");
     copy_resource(to_dir, "repository/application-repository.toml");
 }
 
 #[cfg(target_os = "macos")]
 fn main() {
     println!("cargo:rerun-if-changed=resources/i18n/en-US/builtin.ftl");
-    println!("cargo:rerun-if-changed=resources/icons/512x512/software.Browsers.png");
+    println!("cargo:rerun-if-changed=resources/icons/512x512/me.tarik02.brows.png");
     println!("cargo:rerun-if-changed=resources/repository/application-repository.toml");
     println!("cargo:rerun-if-changed=extra/macos/Info.plist");
     copy_resources();
@@ -79,9 +79,9 @@ fn main() {
 
 #[cfg(target_os = "windows")]
 fn main() {
-    println!("cargo:rerun-if-changed=extra/windows/icons/browsers.ico");
+    println!("cargo:rerun-if-changed=extra/windows/icons/brows.ico");
     let mut res = winres::WindowsResource::new();
-    res.set_icon("extra/windows/icons/browsers.ico");
+    res.set_icon("extra/windows/icons/brows.ico");
     res.compile().unwrap();
 
     // statically link vcruntime140.dll instead of requiring user to install the runtime
@@ -91,7 +91,7 @@ fn main() {
 #[cfg(target_os = "linux")]
 fn main() {
     println!("cargo:rerun-if-changed=extra/linux/deb/DEBIAN/template.control");
-    println!("cargo:rerun-if-changed=extra/linux/rpm/SPECS/template.browsers.spec");
+    println!("cargo:rerun-if-changed=extra/linux/rpm/SPECS/template.brows.spec");
 
     // x86_64, aarch64, arm, i686
     // https://doc.rust-lang.org/reference/conditional-compilation.html#target_arch
@@ -109,14 +109,14 @@ fn main() {
 // e.g target/release/
 //  or target/aarch64-unknown-linux-gnu/release/
 fn get_target_build_path() -> PathBuf {
-    // e.g "/target/aarch64-unknown-linux-gnu/release/build/browsers-f4fff742057613df/out"
-    //  or "/target/release/build/browsers-f4fff742057613df/out"
+    // e.g "/target/aarch64-unknown-linux-gnu/release/build/brows-f4fff742057613df/out"
+    //  or "/target/release/build/brows-f4fff742057613df/out"
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let out_dir = PathBuf::from(out_dir.as_str());
 
     // /target/aarch64-unknown-linux-gnu
     let arch_target_dir = out_dir
-        .parent() // release/build/browsers/
+        .parent() // release/build/brows/
         .map(|a| a.parent()) // target/.../release/build/
         .flatten()
         .map(|a| a.parent()) // target/.../release/
@@ -186,13 +186,13 @@ fn create_rpm_spec(rust_target_arch: &str, arch_target_dir: &Path) {
         .join("linux")
         .join("rpm")
         .join("SPECS")
-        .join("template.browsers.spec");
+        .join("template.brows.spec");
 
     // /target/aarch64-unknown-linux-gnu/meta/rpm_spec/
     let target_rpm_spec_dir_path = arch_target_dir.join("meta").join("rpm_spec");
 
-    // /target/aarch64-unknown-linux-gnu/meta/rpm_spec/browsers.spec
-    let target_rpm_spec_file_path: PathBuf = target_rpm_spec_dir_path.join("browsers.spec");
+    // /target/aarch64-unknown-linux-gnu/meta/rpm_spec/brows.spec
+    let target_rpm_spec_file_path: PathBuf = target_rpm_spec_dir_path.join("brows.spec");
 
     fs::create_dir_all(target_rpm_spec_dir_path).unwrap();
 

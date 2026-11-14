@@ -64,20 +64,20 @@ if %is_local_install% == true (
     REM TODO: would be even more correct to take from registry
     set LocalProgramsDir=%LocalAppData%\Programs
     setlocal EnableDelayedExpansion
-    set ProgramDir=!LocalProgramsDir!\software.Browsers
+    set ProgramDir=!LocalProgramsDir!\me.tarik02.brows
     setlocal DisableDelayedExpansion
     echo Uninstalling only for current user
 ) else (
-    set ProgramDir=%ProgramFiles%\software.Browsers
+    set ProgramDir=%ProgramFiles%\me.tarik02.brows
     echo Uninstalling for all users
 )
 
-REM C:\Users\x\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Browsers\Browsers.lnk
+REM C:\Users\x\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\brows\brows.lnk
 
 if %is_local_install% == true (
-    set ShortcutToDir=%AppData%\Microsoft\Windows\Start Menu\Programs\Browsers
+    set ShortcutToDir=%AppData%\Microsoft\Windows\Start Menu\Programs\brows
 ) else (
-    set ShortcutToDir=%ALLUSERSPROFILE%\Microsoft\Windows\Start Menu\Programs\Browsers
+    set ShortcutToDir=%ALLUSERSPROFILE%\Microsoft\Windows\Start Menu\Programs\brows
 )
 
 if exist "%ShortcutToDir%\" (
@@ -85,9 +85,9 @@ if exist "%ShortcutToDir%\" (
 )
 
 REM TODO: add prompt to ask user if they want to also delete the configuration
-REM if exist "%LocalAppData%\software.Browsers\" (
+REM if exist "%LocalAppData%\me.tarik02.brows\" (
 REM   @echo on
-REM   rmdir "%LocalAppData%\software.Browsers" /s /q
+REM   rmdir "%LocalAppData%\me.tarik02.brows" /s /q
 REM   @echo off
 REM )
 
@@ -99,13 +99,13 @@ if %is_local_install% == true (
     set RegistryRoot=HKLM
 )
 
-REG DELETE "%RegistryRoot%\Software\Classes\software.Browsers" /f
-REG DELETE "%RegistryRoot%\Software\Clients\StartMenuInternet\software.Browsers" /f
-REG DELETE "%RegistryRoot%\Software\RegisteredApplications" /v software.Browsers /f
-REG DELETE "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\App Paths\browsers.exe" /f
-REG DELETE "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\software.Browsers" /f
+REG DELETE "%RegistryRoot%\Software\Classes\me.tarik02.brows" /f
+REG DELETE "%RegistryRoot%\Software\Clients\StartMenuInternet\me.tarik02.brows" /f
+REG DELETE "%RegistryRoot%\Software\RegisteredApplications" /v me.tarik02.brows /f
+REG DELETE "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\App Paths\brows.exe" /f
+REG DELETE "%RegistryRoot%\Software\Microsoft\Windows\CurrentVersion\Uninstall\me.tarik02.brows" /f
 
-REM C:\Users\x\AppData\Local\software.Browsers\
+REM C:\Users\x\AppData\Local\me.tarik02.brows\
 
 REM delete if exists
 REM doing this as the last thing, because it would exit the script when this bat file itself
@@ -119,8 +119,8 @@ if exist "%ProgramDir%\" (
   start /b "" cmd /c rmdir /s /q "%ProgramDir%"
 )
 
-echo Browsers has been uninstalled.
-echo Please report any issues at https://github.com/tarik02-org/browsers-gpui/issues
+echo brows has been uninstalled.
+echo Please report any issues at https://github.com/tarik02-org/brows/issues
 
 echo You can now press Enter to exit this uninstaller.
 set /p input=

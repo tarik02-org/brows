@@ -85,7 +85,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: compiled-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/browsers
+          path: target/${{ matrix.target }}/release/brows
           if-no-files-found: error
 
       - name: Upload package metadata
@@ -130,7 +130,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: compiled-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/browsers
+          path: target/${{ matrix.target }}/release/brows
           if-no-files-found: error
 
       - name: Upload package metadata
@@ -174,7 +174,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: compiled-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/browsers.exe
+          path: target/${{ matrix.target }}/release/brows.exe
           if-no-files-found: error
 
   package-linux:
@@ -245,7 +245,7 @@ jobs:
         run: |
           install_dir="$HOME/.local/bin"
           cd "$install_dir"
-          command_output="$(./browsers --no-gui https://example.com)"
+          command_output="$(./brows --no-gui https://example.com)"
           echo "$command_output"
 
           failed=false
@@ -278,18 +278,18 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: browsers-linux-artifacts
+          name: brows-linux-artifacts
           path: |
-            target/universal-unknown-linux-gnu/release/browsers_linux.tar.gz
-            target/universal-unknown-linux-gnu/release/browsers_linux.tar.gz.sha256
-            target/universal-unknown-linux-gnu/release/browsers_linux.tar.xz
-            target/universal-unknown-linux-gnu/release/browsers_linux.tar.xz.sha256
-            target/universal-unknown-linux-gnu/release/x86_64/browsers_amd64.deb
-            target/universal-unknown-linux-gnu/release/aarch64/browsers_arm64.deb
-            target/universal-unknown-linux-gnu/release/armv7l/browsers_armhf.deb
-            target/universal-unknown-linux-gnu/release/x86_64/browsers.x86_64.rpm
-            target/universal-unknown-linux-gnu/release/aarch64/browsers.aarch64.rpm
-            target/universal-unknown-linux-gnu/release/armv7l/browsers.armhfp.rpm
+            target/universal-unknown-linux-gnu/release/brows_linux.tar.gz
+            target/universal-unknown-linux-gnu/release/brows_linux.tar.gz.sha256
+            target/universal-unknown-linux-gnu/release/brows_linux.tar.xz
+            target/universal-unknown-linux-gnu/release/brows_linux.tar.xz.sha256
+            target/universal-unknown-linux-gnu/release/x86_64/brows_amd64.deb
+            target/universal-unknown-linux-gnu/release/aarch64/brows_arm64.deb
+            target/universal-unknown-linux-gnu/release/armv7l/brows_armhf.deb
+            target/universal-unknown-linux-gnu/release/x86_64/brows.x86_64.rpm
+            target/universal-unknown-linux-gnu/release/aarch64/brows.aarch64.rpm
+            target/universal-unknown-linux-gnu/release/armv7l/brows.armhfp.rpm
           if-no-files-found: error
 
   package-macos:
@@ -331,7 +331,7 @@ jobs:
 
       - name: Test app directory
         run: |
-          cd target/universal-apple-darwin/release/Browsers.app
+          cd target/universal-apple-darwin/release/brows.app
           ls -altrh .
           ls -altrh ./Contents/Resources/
         shell: bash
@@ -341,7 +341,7 @@ jobs:
           target_dir='target/universal-apple-darwin/release'
           cd "$target_dir"
           touch ./output_file
-          open ./Browsers.app -W --stdout output_file --stderr output_file --args --no-gui https://example.com
+          open ./brows.app -W --stdout output_file --stderr output_file --args --no-gui https://example.com
 
           command_output="$(cat ./output_file)"
           echo "$command_output"
@@ -376,13 +376,13 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: browsers-mac-artifacts
+          name: brows-mac-artifacts
           path: |
-            target/universal-apple-darwin/release/Browsers.dmg
-            target/universal-apple-darwin/release/browsers_mac.tar.gz
-            target/universal-apple-darwin/release/browsers_mac.tar.gz.sha256
-            target/universal-apple-darwin/release/browsers_mac.tar.xz
-            target/universal-apple-darwin/release/browsers_mac.tar.xz.sha256
+            target/universal-apple-darwin/release/brows.dmg
+            target/universal-apple-darwin/release/brows_mac.tar.gz
+            target/universal-apple-darwin/release/brows_mac.tar.gz.sha256
+            target/universal-apple-darwin/release/brows_mac.tar.xz
+            target/universal-apple-darwin/release/brows_mac.tar.xz.sha256
           if-no-files-found: error
 
   package-windows:
@@ -433,9 +433,9 @@ jobs:
 
       - name: End-to-end test
         run: |
-          install_dir="$PROGRAMFILES/software.Browsers"
+          install_dir="$PROGRAMFILES/me.tarik02.brows"
           cd "$install_dir"
-          command_output="$(./browsers.exe --no-gui https://example.com)"
+          command_output="$(./brows.exe --no-gui https://example.com)"
           echo "$command_output"
 
           failed=false
@@ -475,13 +475,13 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: browsers-windows-artifacts
+          name: brows-windows-artifacts
           path: |
-            target/universal-pc-windows-msvc/release/Browsers_windows.zip
-            target/universal-pc-windows-msvc/release/browsers_windows.tar.gz
-            target/universal-pc-windows-msvc/release/browsers_windows.tar.gz.sha256
-            target/universal-pc-windows-msvc/release/browsers_windows.tar.xz
-            target/universal-pc-windows-msvc/release/browsers_windows.tar.xz.sha256
+            target/universal-pc-windows-msvc/release/brows_windows.zip
+            target/universal-pc-windows-msvc/release/brows_windows.tar.gz
+            target/universal-pc-windows-msvc/release/brows_windows.tar.gz.sha256
+            target/universal-pc-windows-msvc/release/brows_windows.tar.xz
+            target/universal-pc-windows-msvc/release/brows_windows.tar.xz.sha256
           if-no-files-found: error
 
   release:
@@ -503,13 +503,13 @@ jobs:
       - name: Download release artifacts
         uses: actions/download-artifact@v8
         with:
-          pattern: browsers-*-artifacts
+          pattern: brows-*-artifacts
 
       - name: Verify artifact directories
         run: |
-          [ -e browsers-linux-artifacts ]
-          [ -e browsers-mac-artifacts ]
-          [ -e browsers-windows-artifacts ]
+          [ -e brows-linux-artifacts ]
+          [ -e brows-mac-artifacts ]
+          [ -e brows-windows-artifacts ]
         shell: bash
 
       - name: Upload release assets
@@ -517,23 +517,23 @@ jobs:
         with:
           fail_on_unmatched_files: true
           files: |
-            browsers-linux-artifacts/browsers_linux.tar.gz
-            browsers-linux-artifacts/browsers_linux.tar.gz.sha256
-            browsers-linux-artifacts/browsers_linux.tar.xz
-            browsers-linux-artifacts/browsers_linux.tar.xz.sha256
-            browsers-linux-artifacts/x86_64/browsers_amd64.deb
-            browsers-linux-artifacts/aarch64/browsers_arm64.deb
-            browsers-linux-artifacts/armv7l/browsers_armhf.deb
-            browsers-linux-artifacts/x86_64/browsers.x86_64.rpm
-            browsers-linux-artifacts/aarch64/browsers.aarch64.rpm
-            browsers-linux-artifacts/armv7l/browsers.armhfp.rpm
-            browsers-mac-artifacts/Browsers.dmg
-            browsers-mac-artifacts/browsers_mac.tar.gz
-            browsers-mac-artifacts/browsers_mac.tar.gz.sha256
-            browsers-mac-artifacts/browsers_mac.tar.xz
-            browsers-mac-artifacts/browsers_mac.tar.xz.sha256
-            browsers-windows-artifacts/Browsers_windows.zip
-            browsers-windows-artifacts/browsers_windows.tar.gz
-            browsers-windows-artifacts/browsers_windows.tar.gz.sha256
-            browsers-windows-artifacts/browsers_windows.tar.xz
-            browsers-windows-artifacts/browsers_windows.tar.xz.sha256
+            brows-linux-artifacts/brows_linux.tar.gz
+            brows-linux-artifacts/brows_linux.tar.gz.sha256
+            brows-linux-artifacts/brows_linux.tar.xz
+            brows-linux-artifacts/brows_linux.tar.xz.sha256
+            brows-linux-artifacts/x86_64/brows_amd64.deb
+            brows-linux-artifacts/aarch64/brows_arm64.deb
+            brows-linux-artifacts/armv7l/brows_armhf.deb
+            brows-linux-artifacts/x86_64/brows.x86_64.rpm
+            brows-linux-artifacts/aarch64/brows.aarch64.rpm
+            brows-linux-artifacts/armv7l/brows.armhfp.rpm
+            brows-mac-artifacts/brows.dmg
+            brows-mac-artifacts/brows_mac.tar.gz
+            brows-mac-artifacts/brows_mac.tar.gz.sha256
+            brows-mac-artifacts/brows_mac.tar.xz
+            brows-mac-artifacts/brows_mac.tar.xz.sha256
+            brows-windows-artifacts/brows_windows.zip
+            brows-windows-artifacts/brows_windows.tar.gz
+            brows-windows-artifacts/brows_windows.tar.gz.sha256
+            brows-windows-artifacts/brows_windows.tar.xz
+            brows-windows-artifacts/brows_windows.tar.xz.sha256
