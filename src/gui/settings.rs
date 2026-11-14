@@ -22,7 +22,7 @@ const SETTINGS_SIZE: (f32, f32) = (680.0, 500.0);
 const ABOUT_SIZE: (f32, f32) = (380.0, 280.0);
 const SOURCE_URL: &str = "https://github.com/tarik02-org/brows";
 const ASK_EVERY_TIME: &str = "Ask every time";
-const TITLEBAR_HEIGHT: f32 = 48.0;
+const TITLEBAR_HEIGHT: f32 = 36.0;
 
 /// The Settings and About windows, created hidden with the picker and shown on request.
 pub(super) struct AuxWindows {
