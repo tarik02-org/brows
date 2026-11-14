@@ -371,14 +371,26 @@ impl Picker {
     }
 
     fn open_native_menu(&mut self, kind: MenuKind, at: Option<PointerPress>, tx: &mut Tx) {
+        let native_item = |id: String, label: String, enabled: bool| {
+            rune::PopupItem::new(id, label).enabled(enabled)
+        };
         let mut menu = rune::PopupMenu::new();
-        for line in self.menu_lines(kind) {
+        let mut lines = self.menu_lines(kind).into_iter().peekable();
+        while let Some(line) = lines.next() {
             menu = match line {
-                MenuLine::Item { id, label, enabled } => {
-                    menu.item(rune::PopupItem::new(id, label).enabled(enabled))
-                }
+                MenuLine::Item { id, label, enabled } => menu.item(native_item(id, label, enabled)),
                 MenuLine::Separator => menu.separator(),
-                MenuLine::Label(label) => menu.item(rune::PopupItem::new("", label).enabled(false)),
+                // Native menus reject items without an id, so a labelled group becomes a
+                // submenu of the items up to the next separator.
+                MenuLine::Label(title) => {
+                    let mut submenu = rune::PopupMenu::new();
+                    while let Some(MenuLine::Item { id, label, enabled }) =
+                        lines.next_if(|line| matches!(line, MenuLine::Item { .. }))
+                    {
+                        submenu = submenu.item(native_item(id, label, enabled));
+                    }
+                    menu.submenu(title, submenu)
+                }
             };
         }
         self.native_menu_open = true;
