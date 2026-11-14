@@ -281,6 +281,8 @@ fn settings_view(s: &SettingsUi, cx: &mut Cx<SettingsUi>) -> El {
         return el();
     };
     let k = style::kit(ui.ui_settings.visual_settings.theme, cx);
+    // Rune colours the caption buttons for the system theme, not the app's.
+    cx.caption_color(k.c.icon_base);
     let mut layer = Vec::new();
 
     let tab_index = match ui.ui_settings.tab {
@@ -768,6 +770,7 @@ struct About {
 
 fn about_view(s: &About, cx: &mut Cx<About>) -> El {
     let k = style::kit(s.theme, cx);
+    cx.caption_color(k.c.icon_base);
     let titlebar = el()
         .key("titlebar")
         .h(TITLEBAR_HEIGHT)
