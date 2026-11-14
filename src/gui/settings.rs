@@ -1,892 +1,425 @@
-use super::*;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
 
-impl BrowserApp {
-    pub(super) fn handle_settings_update(
-        &mut self,
-        update: PickerSettingsUpdate,
-        window: Option<&mut Window>,
-        cx: &mut Context<Self>,
-    ) {
-        match update {
-            PickerSettingsUpdate::Theme(theme) => {
-                self.state.ui_settings.visual_settings.theme = theme;
-                apply_theme(theme, window, cx);
-            }
-            PickerSettingsUpdate::ShowHotkeys(show) => {
-                self.state.ui_settings.visual_settings.show_hotkeys = show;
-            }
-            PickerSettingsUpdate::QuitOnLostFocus(quit) => {
-                self.state.ui_settings.visual_settings.quit_on_lost_focus = quit;
-            }
-            PickerSettingsUpdate::UnwrapUrls(unwrap) => {
-                self.state.ui_settings.behavioral_settings.unwrap_urls = unwrap;
-            }
-        }
+use rune::tok::{self, type_};
+use rune::{
+    App, AppHandle, AppSpec, Color, Cx, El, PopupItem, PopupMenu, ScrollSpec, TextEdit, TextStyle, Tx,
+    WindowHandle,
+    WindowOptions, WindowSpec, col, el, row, spacer, text, text_input,
+};
+use tracing::info;
 
-        if let Some(handle) = self.picker_window
-            && handle
-                .update(cx, |picker, window, cx| {
-                    picker.handle_settings_update(update, Some(window), cx)
-                })
-                .is_err()
-        {
-            self.picker_window = None;
-        }
-        cx.notify();
-    }
-    pub(super) fn show_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let settings_window = self.auxiliary_window_handles.borrow().settings;
-        if let Some(handle) = settings_window {
-            if handle
-                .update(cx, |_, window, _| window.activate_window())
-                .is_ok()
-            {
-                return;
-            }
-            self.auxiliary_window_handles.borrow_mut().settings = None;
-        }
+use super::model::{SettingsTab, UIBrowser, UIProfileAndIncognito, UISettingsRule, UIState};
+use super::picker::{Picker, is_dark};
+use crate::MessageToMain;
+use crate::paths;
+use crate::utils::ConfiguredTheme;
 
-        let state = self.state.clone();
-        let main_sender = self.main_sender.clone();
-        let unwrap_urls = self.unwrap_urls.clone();
-        let settings_updates_sender = self.settings_updates_sender.clone();
-        let auxiliary_windows = self.auxiliary_windows.clone();
-        let auxiliary_window_handles = self.auxiliary_window_handles.clone();
-        let bounds = Bounds::centered(
-            window.display(cx).map(|display| display.id()),
-            size(px(SETTINGS_WIDTH), px(SETTINGS_HEIGHT)),
-            cx,
-        );
-        auxiliary_windows.fetch_add(1, Ordering::Relaxed);
+const SETTINGS_SIZE: (f32, f32) = (680.0, 500.0);
+const ABOUT_SIZE: (f32, f32) = (380.0, 280.0);
+const SOURCE_URL: &str = "https://github.com/tarik02-org/browsers-gpui";
 
-        match cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                titlebar: Some(TitlebarOptions {
-                    title: Some("Browsers Settings".into()),
-                    ..Default::default()
-                }),
-                kind: WindowKind::Normal,
-                window_background: WindowBackgroundAppearance::Opaque,
-                app_id: Some("software.Browsers.settings".to_string()),
-                window_min_size: Some(size(px(600.0), px(420.0))),
-                window_decorations: Some(WindowDecorations::Server),
-                ..Default::default()
-            },
-            move |window, cx| {
-                let view = cx.new(|cx| {
-                    BrowserApp::new_auxiliary(
-                        state,
-                        main_sender,
-                        unwrap_urls,
-                        Screen::Settings,
-                        settings_updates_sender,
-                        auxiliary_windows,
-                        auxiliary_window_handles,
-                        false,
-                        window,
-                        cx,
-                    )
-                });
-                cx.new(|cx| Root::new(view, window, cx))
-            },
-        ) {
-            Ok(handle) => {
-                self.auxiliary_window_handles.borrow_mut().settings = Some(handle.into());
-                if self.persistent {
-                    self.dismiss_picker(window, cx);
-                } else {
-                    window.remove_window();
-                }
-            }
-            Err(error) => {
-                self.auxiliary_windows.fetch_sub(1, Ordering::Relaxed);
-                warn!("Could not open settings window: {error}");
-            }
-        }
-    }
-    pub(super) fn show_about(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let about_window = self.auxiliary_window_handles.borrow().about;
-        if let Some(handle) = about_window {
-            if handle
-                .update(cx, |_, window, _| window.activate_window())
-                .is_ok()
-            {
-                return;
-            }
-            self.auxiliary_window_handles.borrow_mut().about = None;
-        }
+/// The Settings and About windows, created hidden with the picker and shown on request.
+pub(super) struct AuxWindows {
+    settings: AppHandle<SettingsUi>,
+    settings_window: WindowHandle,
+    settings_open: Arc<AtomicBool>,
+    about_window: WindowHandle,
+    about_open: Arc<AtomicBool>,
+}
 
-        let state = self.state.clone();
-        let main_sender = self.main_sender.clone();
-        let unwrap_urls = self.unwrap_urls.clone();
-        let settings_updates_sender = self.settings_updates_sender.clone();
-        let auxiliary_windows = self.auxiliary_windows.clone();
-        let auxiliary_window_handles = self.auxiliary_window_handles.clone();
-        let bounds = Bounds::centered(
-            window.display(cx).map(|display| display.id()),
-            size(px(ABOUT_WIDTH), px(ABOUT_HEIGHT)),
-            cx,
-        );
-        auxiliary_windows.fetch_add(1, Ordering::Relaxed);
-
-        match cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                titlebar: Some(TitlebarOptions {
-                    title: Some("About Browsers".into()),
-                    ..Default::default()
-                }),
-                kind: WindowKind::Normal,
-                is_resizable: false,
-                is_minimizable: false,
-                window_background: WindowBackgroundAppearance::Opaque,
-                app_id: Some("software.Browsers.about".to_string()),
-                window_min_size: Some(size(px(ABOUT_WIDTH), px(ABOUT_HEIGHT))),
-                window_decorations: Some(WindowDecorations::Server),
-                ..Default::default()
-            },
-            move |window, cx| {
-                let view = cx.new(|cx| {
-                    BrowserApp::new_auxiliary(
-                        state,
-                        main_sender,
-                        unwrap_urls,
-                        Screen::About,
-                        settings_updates_sender,
-                        auxiliary_windows,
-                        auxiliary_window_handles,
-                        false,
-                        window,
-                        cx,
-                    )
-                });
-                cx.new(|cx| Root::new(view, window, cx))
-            },
-        ) {
-            Ok(handle) => {
-                self.auxiliary_window_handles.borrow_mut().about = Some(handle.into());
-                if self.persistent {
-                    self.dismiss_picker(window, cx);
-                } else {
-                    window.remove_window();
-                }
-            }
-            Err(error) => {
-                self.auxiliary_windows.fetch_sub(1, Ordering::Relaxed);
-                warn!("Could not open About window: {error}");
-            }
-        }
-    }
-    pub(super) fn set_settings_tab(&mut self, index: usize, cx: &mut Context<Self>) {
-        self.state.ui_settings.tab = match index {
-            1 => SettingsTab::Rules,
-            2 => SettingsTab::Advanced,
-            _ => SettingsTab::General,
+impl AuxWindows {
+    pub(super) fn create(
+        app: &mut App<Picker>,
+        state: &UIState,
+        main_sender: Sender<MessageToMain>,
+        picker: AppHandle<Picker>,
+        persistent: bool,
+    ) -> Self {
+        let hidden = WindowOptions {
+            visible: false,
+            ..Default::default()
         };
-        cx.notify();
+
+        let settings_open = Arc::new(AtomicBool::new(false));
+        let mut settings_state = SettingsUi {
+            ui: None,
+            rules: Vec::new(),
+            main_sender,
+            picker,
+            open: settings_open.clone(),
+            persistent,
+        };
+        settings_state.load(state.clone());
+        let settings_app = App::new(AppSpec {
+            min_size: Some((600.0, 420.0)),
+            on_key: Some(close_on_escape),
+            ..AppSpec::new("Browsers Settings", SETTINGS_SIZE, || unreachable!(), settings_view)
+        })
+        .init(move || settings_state)
+        .on_close(|s, tx| {
+            s.open.store(false, Ordering::Relaxed);
+            if !s.persistent {
+                tx.quit();
+            }
+        });
+        let (settings, settings_window) =
+            app.window(WindowSpec::from_app("settings", settings_app).options(hidden.clone()));
+
+        let about_open = Arc::new(AtomicBool::new(false));
+        let about_state = About {
+            open: about_open.clone(),
+            persistent,
+        };
+        let about_app = App::new(AppSpec {
+            min_size: Some(ABOUT_SIZE),
+            on_key: Some(close_on_escape),
+            ..AppSpec::new("About Browsers", ABOUT_SIZE, || unreachable!(), about_view)
+        })
+        .init(move || about_state)
+        .on_close(|s, tx| {
+            s.open.store(false, Ordering::Relaxed);
+            if !s.persistent {
+                tx.quit();
+            }
+        });
+        let (_, about_window) = app.window(
+            WindowSpec::from_app("about", about_app).options(WindowOptions {
+                resizable: false,
+                ..hidden
+            }),
+        );
+
+        Self {
+            settings,
+            settings_window,
+            settings_open,
+            about_window,
+            about_open,
+        }
     }
-    pub(super) fn set_theme(
-        &mut self,
-        theme: ConfiguredTheme,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.state.ui_settings.visual_settings.theme = theme;
-        apply_theme(theme, Some(window), cx);
-        self.settings_updates_sender
-            .send(PickerSettingsUpdate::Theme(theme))
-            .ok();
-        self.send(MessageToMain::SaveConfigUISettings(
-            self.state.ui_settings.visual_settings.clone(),
-        ));
-        cx.notify();
+
+    pub(super) fn any_open(&self) -> bool {
+        self.settings_open.load(Ordering::Relaxed) || self.about_open.load(Ordering::Relaxed)
     }
-    pub(super) fn save_rules(&mut self, cx: &mut Context<Self>) {
-        let rules = self
-            .rule_editors
+
+    pub(super) fn show_settings(&self, state: &UIState) {
+        let state = state.clone();
+        self.settings.update(move |s, _| s.load(state));
+        self.settings_open.store(true, Ordering::Relaxed);
+        self.settings_window.open();
+    }
+
+    pub(super) fn show_about(&self) {
+        self.about_open.store(true, Ordering::Relaxed);
+        self.about_window.open();
+    }
+}
+
+fn close_on_escape<S>(_: &mut S, event: &rune::KeyEvent, tx: &mut Tx) -> bool {
+    if event.key == rune::Key::Escape {
+        tx.close_window();
+        return true;
+    }
+    false
+}
+
+struct RuleEditor {
+    source_app: TextEdit,
+    url_pattern: TextEdit,
+    opener: Option<UIProfileAndIncognito>,
+}
+
+struct SettingsUi {
+    ui: Option<UIState>,
+    rules: Vec<RuleEditor>,
+    main_sender: Sender<MessageToMain>,
+    picker: AppHandle<Picker>,
+    open: Arc<AtomicBool>,
+    persistent: bool,
+}
+
+impl SettingsUi {
+    fn load(&mut self, state: UIState) {
+        self.rules = state
+            .ui_settings
+            .rules
+            .iter()
+            .filter(|rule| !rule.deleted)
+            .map(|rule| RuleEditor {
+                source_app: TextEdit::new(rule.source_app.clone()),
+                url_pattern: TextEdit::new(rule.url_pattern.clone()),
+                opener: rule.opener.clone(),
+            })
+            .collect();
+        self.ui = Some(state);
+    }
+
+    fn send(&self, message: MessageToMain) {
+        self.main_sender.send(message).ok();
+    }
+
+    fn ui(&mut self) -> &mut UIState {
+        self.ui.as_mut().expect("settings shown before load")
+    }
+
+    fn save_visual_settings(&mut self) {
+        let visual = self.ui().ui_settings.visual_settings.clone();
+        let for_picker = visual.clone();
+        self.picker
+            .update(move |p, _| p.state.ui_settings.visual_settings = for_picker);
+        self.send(MessageToMain::SaveConfigUISettings(visual));
+    }
+
+    fn set_unwrap_urls(&mut self, unwrap: bool) {
+        self.ui().ui_settings.behavioral_settings.unwrap_urls = unwrap;
+        let behavior = self.ui().ui_settings.behavioral_settings.clone();
+        self.picker
+            .update(move |p, _| p.state.ui_settings.behavioral_settings.unwrap_urls = unwrap);
+        self.send(MessageToMain::SaveConfigUIBehavioralSettings(behavior));
+    }
+
+    fn save_rules(&mut self) {
+        let rules: Vec<UISettingsRule> = self
+            .rules
             .iter()
             .enumerate()
             .map(|(index, editor)| UISettingsRule {
                 index,
                 saved: true,
                 deleted: false,
-                source_app: editor.source_app.read(cx).value().to_string(),
-                url_pattern: editor.url_pattern.read(cx).value().to_string(),
+                source_app: editor.source_app.text.clone(),
+                url_pattern: editor.url_pattern.text.clone(),
                 opener: editor.opener.clone(),
             })
-            .collect::<Vec<_>>();
-        self.state.ui_settings.rules = Arc::new(rules.clone());
+            .collect();
+        self.ui().ui_settings.rules = Arc::new(rules.clone());
+        let for_picker = rules.clone();
+        self.picker
+            .update(move |p, _| p.state.ui_settings.rules = Arc::new(for_picker));
+        info!("Saving {} rules", rules.len());
         self.send(MessageToMain::SaveConfigRules(rules));
-        cx.notify();
     }
-    pub(super) fn add_rule(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let index = self.rule_editors.len();
-        let rule = UISettingsRule {
-            index,
-            saved: false,
-            deleted: false,
-            source_app: String::new(),
-            url_pattern: String::new(),
-            opener: None,
-        };
-        self.rule_editors.push(RuleEditor::new(&rule, window, cx));
-        cx.notify();
+
+    fn set_default_opener(&mut self, opener: Option<UIProfileAndIncognito>) {
+        self.ui().ui_settings.default_opener = opener.clone();
+        let for_picker = opener.clone();
+        self.picker
+            .update(move |p, _| p.state.ui_settings.default_opener = for_picker);
+        self.send(MessageToMain::SaveConfigDefaultOpener(opener));
     }
-    pub(super) fn remove_rule(&mut self, index: usize, cx: &mut Context<Self>) {
-        if index < self.rule_editors.len() {
-            self.rule_editors.remove(index);
-            self.save_rules(cx);
+}
+
+/// `rune::tok` styles, plus the accent for primary controls.
+struct Style {
+    t: tok::Theme,
+    accent: Color,
+}
+
+impl Style {
+    fn new<S: 'static>(theme: ConfiguredTheme, cx: &mut Cx<S>) -> Self {
+        let dark = is_dark(theme, cx.system_dark());
+        Self {
+            t: tok::theme(dark),
+            accent: tok::accent(0, dark),
         }
     }
-    pub(super) fn render_settings(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        let selected = match self.state.ui_settings.tab {
-            SettingsTab::General => 0,
-            SettingsTab::Rules => 1,
-            SettingsTab::Advanced => 2,
+
+    fn button(&self, key: impl Into<String>, label: impl Into<String>, primary: bool) -> El {
+        let (fill, color) = if primary {
+            (self.accent, Color::WHITE)
+        } else {
+            (self.t.control_off, self.t.text)
         };
-        let tabs = TabBar::new("settings-tabs")
-            .segmented()
-            .selected_index(selected)
-            .children([
-                Tab::new().label("General"),
-                Tab::new().label("Rules"),
-                Tab::new().label("Advanced"),
-            ])
-            .on_click(cx.listener(|this, index, _, cx| {
-                this.set_settings_tab(*index, cx);
-            }));
-
-        let content = match self.state.ui_settings.tab {
-            SettingsTab::General => self.render_general_settings(window, cx),
-            SettingsTab::Rules => self.render_rules_settings(window, cx),
-            SettingsTab::Advanced => self.render_advanced_settings(window, cx),
-        };
-
-        v_flex()
-            .track_focus(&self.focus_handle)
-            .on_key_down(cx.listener(Self::handle_key_down))
-            .size_full()
-            .bg(cx.theme().background)
-            .text_color(cx.theme().foreground)
-            .child(
-                h_flex()
-                    .h(px(44.0))
-                    .px_3()
-                    .border_b_1()
-                    .border_color(cx.theme().border)
-                    .child(tabs),
-            )
-            .child(gpui::div().flex_1().min_h_0().p_3().child(content))
+        row()
+            .key(key)
+            .h(26.0)
+            .px(10.0)
+            .radius(6.0)
+            .center()
+            .fill(fill)
+            .hover(fill.alpha(0.85))
+            .child(text(label).font(type_::LABEL).color(color))
     }
-    pub(super) fn render_general_settings(
-        &mut self,
-        _: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
-        let theme_index = match self.state.ui_settings.visual_settings.theme {
-            ConfiguredTheme::Auto => 0,
-            ConfiguredTheme::Light => 1,
-            ConfiguredTheme::Dark => 2,
-        };
-        let theme_tabs = TabBar::new("theme-tabs")
-            .segmented()
-            .selected_index(theme_index)
-            .children([
-                Tab::new().label("System"),
-                Tab::new().label("Light"),
-                Tab::new().label("Dark"),
-            ])
-            .on_click(cx.listener(|this, index, window, cx| {
-                let theme = match index {
-                    1 => ConfiguredTheme::Light,
-                    2 => ConfiguredTheme::Dark,
-                    _ => ConfiguredTheme::Auto,
-                };
-                this.set_theme(theme, window, cx);
-            }));
 
-        let hotkeys = self.state.ui_settings.visual_settings.show_hotkeys;
-        let quit_on_blur = self.state.ui_settings.visual_settings.quit_on_lost_focus;
-        let unwrap = self.state.ui_settings.behavioral_settings.unwrap_urls;
-
-        v_flex()
-            .gap_3()
-            .child(setting_row(
-                "Appearance",
-                "Follow the system or choose a fixed theme",
-                theme_tabs,
-            ))
-            .child(setting_row(
-                "Keyboard hints",
-                "Show number shortcuts in the browser picker",
-                Switch::new("show-hotkeys")
-                    .checked(hotkeys)
-                    .on_click(cx.listener(|this, checked, _, cx| {
-                        this.state.ui_settings.visual_settings.show_hotkeys = *checked;
-                        this.settings_updates_sender
-                            .send(PickerSettingsUpdate::ShowHotkeys(*checked))
-                            .ok();
-                        this.send(MessageToMain::SaveConfigUISettings(
-                            this.state.ui_settings.visual_settings.clone(),
-                        ));
-                        cx.notify();
-                    })),
-            ))
-            .child(setting_row(
-                "Close when focus is lost",
-                "Dismiss the picker after switching to another app",
-                Switch::new("quit-on-blur")
-                    .checked(quit_on_blur)
-                    .on_click(cx.listener(|this, checked, _, cx| {
-                        this.state.ui_settings.visual_settings.quit_on_lost_focus = *checked;
-                        this.settings_updates_sender
-                            .send(PickerSettingsUpdate::QuitOnLostFocus(*checked))
-                            .ok();
-                        this.send(MessageToMain::SaveConfigUISettings(
-                            this.state.ui_settings.visual_settings.clone(),
-                        ));
-                        cx.notify();
-                    })),
-            ))
-            .child(setting_row(
-                "Unwrap tracking links",
-                "Open the destination behind Outlook Safe Links and Messenger redirects",
-                Switch::new("unwrap-urls")
-                    .checked(unwrap)
-                    .on_click(cx.listener(|this, checked, _, cx| {
-                        this.state.ui_settings.behavioral_settings.unwrap_urls = *checked;
-                        this.unwrap_urls.store(*checked, Ordering::Relaxed);
-                        this.settings_updates_sender
-                            .send(PickerSettingsUpdate::UnwrapUrls(*checked))
-                            .ok();
-                        this.send(MessageToMain::SaveConfigUIBehavioralSettings(
-                            this.state.ui_settings.behavioral_settings.clone(),
-                        ));
-                        cx.notify();
-                    })),
-            ))
-            .into_any_element()
+    fn switch(&self, key: impl Into<String>, on: bool, enabled: bool) -> El {
+        let knob = el()
+            .size(16.0, 16.0)
+            .radius(8.0)
+            .fill(self.t.knob)
+            .absolute(if on { 16.0 } else { 2.0 }, 2.0);
+        el().key(key)
+            .role("switch")
+            .checked(on)
+            .size(34.0, 20.0)
+            .radius(10.0)
+            .fill(if on { self.accent } else { self.t.control_off })
+            .opacity(if enabled { 1.0 } else { 0.4 })
+            .child(knob)
     }
-    pub(super) fn render_rules_settings(
-        &mut self,
-        _: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
-        let weak = cx.weak_entity();
-        let browser_profiles = self.state.browsers.clone();
-        let default_label =
-            opener_label(&self.state.ui_settings.default_opener, &self.state.browsers);
-        let default_weak = weak.clone();
-        let default_profiles = browser_profiles.clone();
-        let default_private = self
-            .state
-            .ui_settings
-            .default_opener
-            .as_ref()
-            .is_some_and(|opener| opener.incognito);
-        let default_private_disabled = self.state.ui_settings.default_opener.is_none();
-        let default_button = Button::new("default-opener")
-            .label(default_label)
-            .outline()
-            .small()
-            .dropdown_menu(move |mut menu, _, _| {
-                let none_weak = default_weak.clone();
-                menu = menu.item(PopupMenuItem::new("Ask every time").on_click(move |_, _, cx| {
-                    none_weak
-                        .update(cx, |this, cx| {
-                            this.state.ui_settings.default_opener = None;
-                            this.send(MessageToMain::SaveConfigDefaultOpener(None));
-                            cx.notify();
-                        })
-                        .ok();
-                }));
-                menu = menu.min_w(px(220.0));
-                for profile in default_profiles.iter() {
-                    let item_weak = default_weak.clone();
-                    let profile_id = profile.unique_id.clone();
-                    menu = menu.item(opener_menu_item(profile).on_click(move |_, _, cx| {
-                        item_weak
-                            .update(cx, |this, cx| {
-                                let incognito = this
-                                    .state
-                                    .ui_settings
-                                    .default_opener
-                                    .as_ref()
-                                    .is_some_and(|opener| opener.incognito);
-                                let opener = UIProfileAndIncognito {
-                                    profile: profile_id.clone(),
-                                    incognito,
-                                };
-                                this.state.ui_settings.default_opener = Some(opener.clone());
-                                this.send(MessageToMain::SaveConfigDefaultOpener(Some(opener)));
-                                cx.notify();
-                            })
-                            .ok();
-                    }));
-                }
-                menu
-            });
-        let default_private_switch = Switch::new("default-private")
-            .label("Private")
-            .small()
-            .checked(default_private)
-            .disabled(default_private_disabled)
-            .on_click(cx.listener(|this, checked, _, cx| {
-                if let Some(opener) = this.state.ui_settings.default_opener.as_mut() {
-                    opener.incognito = *checked;
-                    let opener = opener.clone();
-                    this.send(MessageToMain::SaveConfigDefaultOpener(Some(opener)));
-                    cx.notify();
-                }
-            }));
 
-        let rules = self
-            .rule_editors
-            .iter()
-            .enumerate()
-            .map(|(index, editor)| {
-                let opener = opener_label(&editor.opener, &browser_profiles);
-                let opener_weak = weak.clone();
-                let profiles = browser_profiles.clone();
-                let delete_weak = weak.clone();
-                let private_weak = weak.clone();
-                let private = editor
-                    .opener
-                    .as_ref()
-                    .is_some_and(|opener| opener.incognito);
-                let private_disabled = editor.opener.is_none();
-                v_flex()
-                    .rounded_lg()
-                    .border_1()
-                    .border_color(cx.theme().border)
-                    .bg(cx.theme().secondary)
-                    .overflow_hidden()
-                    .child(
-                        h_flex()
-                            .h(px(30.0))
-                            .px_2()
-                            .border_b_1()
-                            .border_color(cx.theme().border)
-                            .child(
-                                gpui::div()
-                                    .text_xs()
-                                    .font_semibold()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(format!("RULE {:02}", index + 1)),
-                            )
-                            .child(gpui::div().flex_1())
-                            .child(
-                                Button::new(("delete-rule", index))
-                                    .icon(Icon::empty().path(TRASH_ICON_PATH))
-                                    .ghost()
-                                    .small()
-                                    .tooltip("Delete rule")
-                                    .on_click(move |_, _, cx| {
-                                        delete_weak
-                                            .update(cx, |this, cx| this.remove_rule(index, cx))
-                                            .ok();
-                                    }),
-                            ),
-                    )
-                    .child(
-                        v_flex()
-                            .p_2()
-                            .gap_2()
-                            .child(
-                                h_flex()
-                                    .gap_2()
-                                    .child(
-                                        gpui::div()
-                                            .w(px(48.0))
-                                            .h(px(24.0))
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .rounded_md()
-                                            .bg(cx.theme().accent)
-                                            .text_xs()
-                                            .font_semibold()
-                                            .text_color(cx.theme().accent_foreground)
-                                            .child("WHEN"),
-                                    )
-                                    .child(
-                                        gpui::div()
-                                            .w(px(240.0))
-                                            .child(Input::new(&editor.source_app).small()),
-                                    )
-                                    .child(
-                                        gpui::div()
-                                            .text_xs()
-                                            .text_color(cx.theme().muted_foreground)
-                                            .child("AND"),
-                                    )
-                                    .child(
-                                        gpui::div()
-                                            .flex_1()
-                                            .child(Input::new(&editor.url_pattern).small()),
-                                    ),
-                            )
-                            .child(
-                                h_flex()
-                                    .gap_2()
-                                    .child(
-                                        gpui::div()
-                                            .w(px(48.0))
-                                            .h(px(24.0))
-                                            .flex()
-                                            .items_center()
-                                            .justify_center()
-                                            .rounded_md()
-                                            .bg(cx.theme().primary)
-                                            .text_xs()
-                                            .font_semibold()
-                                            .text_color(cx.theme().primary_foreground)
-                                            .child("THEN"),
-                                    )
-                                    .child(
-                                        Button::new(("rule-opener", index))
-                                            .label(opener)
-                                            .outline()
-                                            .small()
-                                            .dropdown_menu(move |mut menu, _, _| {
-                                                menu = menu.min_w(px(220.0));
-                                                for profile in profiles.iter() {
-                                                    let item_weak = opener_weak.clone();
-                                                    let profile_id = profile.unique_id.clone();
-                                                    menu = menu.item(
-                                                        opener_menu_item(profile).on_click(
-                                                            move |_, _, cx| {
-                                                                item_weak
-                                                                    .update(cx, |this, cx| {
-                                                                        if let Some(editor) = this
-                                                                            .rule_editors
-                                                                            .get_mut(index)
-                                                                        {
-                                                                            let incognito = editor
-                                                                                .opener
-                                                                                .as_ref()
-                                                                                .is_some_and(
-                                                                                    |opener| {
-                                                                                        opener
-                                                                                            .incognito
-                                                                                    },
-                                                                                );
-                                                                            editor.opener = Some(
-                                                                                UIProfileAndIncognito {
-                                                                                    profile:
-                                                                                        profile_id
-                                                                                            .clone(),
-                                                                                    incognito,
-                                                                                },
-                                                                            );
-                                                                        }
-                                                                        cx.notify();
-                                                                    })
-                                                                    .ok();
-                                                            }),
-                                                    );
-                                                }
-                                                menu
-                                            }),
-                                    )
-                                    .child(
-                                        Switch::new(("rule-private", index))
-                                            .label("Private")
-                                            .small()
-                                            .checked(private)
-                                            .disabled(private_disabled)
-                                            .on_click(move |checked, _, cx| {
-                                                private_weak
-                                                    .update(cx, |this, cx| {
-                                                        if let Some(opener) = this
-                                                            .rule_editors
-                                                            .get_mut(index)
-                                                            .and_then(|editor| {
-                                                                editor.opener.as_mut()
-                                                            })
-                                                        {
-                                                            opener.incognito = *checked;
-                                                            cx.notify();
-                                                        }
-                                                    })
-                                                    .ok();
-                                            }),
-                                    ),
-                            ),
-                    )
-            })
-            .collect::<Vec<_>>();
-        let rule_count = rules.len();
-
-        v_flex()
-            .size_full()
-            .gap_3()
+    fn setting_row(&self, title: &str, description: &str, control: El) -> El {
+        row()
+            .w_full()
+            .py(6.0)
+            .gap(12.0)
+            .center_y()
             .child(
-                h_flex()
-                    .p_2()
-                    .gap_3()
-                    .rounded_lg()
-                    .border_1()
-                    .border_color(cx.theme().border)
-                    .bg(cx.theme().secondary)
-                    .child(
-                        gpui::div()
-                            .size_8()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .rounded_lg()
-                            .bg(cx.theme().accent)
-                            .font_semibold()
-                            .text_color(cx.theme().accent_foreground)
-                            .child("↗"),
-                    )
-                    .child(
-                        v_flex()
-                            .flex_1()
-                            .child(
-                                gpui::div()
-                                    .text_sm()
-                                    .font_semibold()
-                                    .child("Fallback opener"),
-                            )
-                            .child(
-                                gpui::div()
-                                    .text_xs()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child("Used when no rule matches"),
-                            ),
-                    )
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .child(default_button)
-                            .child(default_private_switch),
-                    ),
+                col()
+                    .grow(1.0)
+                    .min_w(0.0)
+                    .gap(2.0)
+                    .child(text(title).font(type_::TITLE).color(self.t.text))
+                    .child(text(description).font(type_::LABEL).color(self.t.text_secondary)),
             )
-            .child(
-                h_flex()
-                    .gap_2()
-                    .child(gpui::div().font_semibold().child("Opening rules"))
-                    .child(
-                        gpui::div()
-                            .px_2()
-                            .py_0p5()
-                            .rounded_md()
-                            .bg(cx.theme().secondary)
-                            .text_xs()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(rule_count.to_string()),
-                    )
-                    .child(
-                        gpui::div()
-                            .text_xs()
-                            .text_color(cx.theme().muted_foreground)
-                            .child("First match wins"),
-                    )
-                    .child(gpui::div().flex_1())
-                    .child(
-                        Button::new("add-rule")
-                            .label("Add rule")
-                            .icon(IconName::Plus)
-                            .outline()
-                            .small()
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.add_rule(window, cx);
-                            })),
-                    )
-                    .child(
-                        Button::new("save-rules")
-                            .label("Save changes")
-                            .icon(IconName::Check)
-                            .primary()
-                            .small()
-                            .on_click(cx.listener(|this, _, _, cx| this.save_rules(cx))),
-                    ),
-            )
-            .child(
-                v_flex()
-                    .id("rules-list")
-                    .flex_1()
-                    .min_h_0()
-                    .gap_2()
-                    .overflow_y_scroll()
-                    .when(rule_count == 0, |this| {
-                        this.child(
-                            v_flex()
-                                .flex_1()
-                                .items_center()
-                                .justify_center()
-                                .gap_1()
-                                .rounded_lg()
-                                .border_1()
-                                .border_color(cx.theme().border)
-                                .text_color(cx.theme().muted_foreground)
-                                .child(gpui::div().font_semibold().child("No opening rules"))
-                                .child(
-                                    gpui::div()
-                                        .text_xs()
-                                        .child("Add one to route matching links automatically"),
-                                ),
-                        )
-                    })
-                    .children(rules),
-            )
-            .into_any_element()
+            .child(control)
     }
-    pub(super) fn render_advanced_settings(
-        &mut self,
-        _: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> gpui::AnyElement {
-        let hidden = self.state.restorable_app_profiles.clone();
-        let hidden_rows = hidden
-            .iter()
-            .enumerate()
-            .map(|(index, profile)| {
-                let id = profile.unique_id.clone();
-                let full_name = profile.get_full_name();
-                h_flex()
-                    .py_1()
-                    .child(gpui::div().flex_1().child(full_name))
-                    .child(
-                        Button::new(("restore", index))
-                            .label("Restore")
-                            .outline()
-                            .small()
-                            .on_click(cx.listener(move |this, _, _, _| {
-                                this.send(MessageToMain::RestoreAppProfile(id.clone()));
-                            })),
-                    )
-            })
-            .collect::<Vec<_>>();
 
-        v_flex()
-            .gap_3()
-            .child(setting_row(
-                "Default browser",
-                "Register Browsers as the system handler for web links",
-                Button::new("make-default")
-                    .label("Make default")
-                    .primary()
-                    .on_click(cx.listener(|this, _, _, _| {
-                        this.send(MessageToMain::SetBrowsersAsDefaultBrowser);
-                    })),
-            ))
-            .child(setting_row(
-                "Installed applications",
-                "Rescan browser profiles and desktop URL handlers",
-                Button::new("refresh-apps")
-                    .label("Refresh")
-                    .outline()
-                    .on_click(cx.listener(|this, _, _, _| {
-                        this.send(MessageToMain::Refresh);
-                    })),
-            ))
-            .when(!hidden_rows.is_empty(), |this| {
-                this.child(
-                    v_flex()
-                        .gap_2()
-                        .child(gpui::div().font_semibold().child("Hidden profiles"))
-                        .children(hidden_rows),
-                )
-            })
-            .child(
-                v_flex()
-                    .gap_1()
-                    .pt_2()
-                    .border_t_1()
-                    .border_color(cx.theme().border)
-                    .text_xs()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(format!(
-                        "Configuration: {}",
-                        paths::get_config_json_path().display()
-                    ))
-                    .child(format!("Cache: {}", paths::get_cache_root_dir().display()))
-                    .child(format!("Logs: {}", paths::get_logs_root_dir().display())),
-            )
-            .into_any_element()
-    }
-    pub(super) fn render_about(
-        &mut self,
-        _: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        v_flex()
-            .track_focus(&self.focus_handle)
-            .on_key_down(cx.listener(Self::handle_key_down))
-            .size_full()
-            .p_4()
-            .gap_2()
-            .items_center()
-            .justify_center()
-            .bg(cx.theme().background)
-            .text_color(cx.theme().foreground)
-            .when(paths::get_app_icon_path().exists(), |this| {
-                this.child(img(paths::get_app_icon_path()).size_12())
-            })
-            .child(gpui::div().text_xl().font_semibold().child("Browsers"))
-            .child(
-                gpui::div()
-                    .text_sm()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(format!("Version {}", env!("CARGO_PKG_VERSION"))),
-            )
-            .child("Open the right browser at the right time.")
-            .child(
-                h_flex()
-                    .gap_2()
-                    .child(
-                        Button::new("source-code")
-                            .label("Source code")
-                            .outline()
-                            .on_click(|_, _, cx| {
-                                cx.open_url("https://github.com/tarik02-org/browsers-gpui")
-                            }),
-                    )
-                    .child(
-                        Button::new("about-close")
-                            .label("Close")
-                            .primary()
-                            .on_click(|_, window, _| window.remove_window()),
-                    ),
-            )
+    fn segmented<S: 'static>(
+        &self,
+        key: &str,
+        labels: &[&str],
+        selected: usize,
+        pick: fn(&mut S, usize),
+    ) -> El {
+        let mut segments = row()
+            .key(key.to_string())
+            .h(28.0)
+            .padding(2.0)
+            .gap(2.0)
+            .radius(7.0)
+            .fill(self.t.control_track);
+        for (index, label) in labels.iter().enumerate() {
+            let active = index == selected;
+            segments = segments.child(
+                row()
+                    .key(format!("{key}-{index}"))
+                    .h_full()
+                    .px(12.0)
+                    .radius(5.0)
+                    .center()
+                    .fill(if active { self.t.text.alpha(0.14) } else { Color::TRANSPARENT })
+                    .child(text(*label).font(type_::LABEL).color(self.t.text))
+                    .on_press(move |s: &mut S| pick(s, index)),
+            );
+        }
+        segments
     }
 }
 
-fn setting_row(
-    title: impl Into<SharedString>,
-    description: impl Into<SharedString>,
-    control: impl IntoElement,
-) -> impl IntoElement {
-    h_flex()
+fn settings_view(s: &SettingsUi, cx: &mut Cx<SettingsUi>) -> El {
+    let Some(ui) = &s.ui else {
+        return el();
+    };
+    let st = Style::new(ui.ui_settings.visual_settings.theme, cx);
+    let tab = ui.ui_settings.tab;
+
+    let tab_index = match tab {
+        SettingsTab::General => 0,
+        SettingsTab::Rules => 1,
+        SettingsTab::Advanced => 2,
+    };
+    let tabs = st.segmented(
+        "tabs",
+        &["General", "Rules", "Advanced"],
+        tab_index,
+        |s: &mut SettingsUi, index| {
+            s.ui().ui_settings.tab = match index {
+                1 => SettingsTab::Rules,
+                2 => SettingsTab::Advanced,
+                _ => SettingsTab::General,
+            };
+        },
+    );
+
+    let content = match tab {
+        SettingsTab::General => general_tab(ui, &st),
+        SettingsTab::Rules => rules_tab(s, ui, &st),
+        SettingsTab::Advanced => advanced_tab(ui, &st),
+    };
+
+    col()
         .w_full()
-        .py_1()
-        .gap_3()
+        .h_full()
+        .fill(st.t.bg)
         .child(
-            v_flex()
-                .flex_1()
-                .gap_1()
-                .child(gpui::div().font_semibold().child(title.into()))
-                .child(
-                    gpui::div()
-                        .text_xs()
-                        .text_color(gpui::hsla(0.0, 0.0, 0.5, 1.0))
-                        .child(description.into()),
-                ),
+            row()
+                .h(44.0)
+                .w_full()
+                .px(12.0)
+                .center_y()
+                .child(tabs),
         )
-        .child(control)
+        .child(el().h(1.0).w_full().fill(st.t.separator))
+        .child(col().w_full().grow(1.0).min_h(0.0).padding(12.0).child(content))
 }
-fn opener_label(
-    opener: &Option<UIProfileAndIncognito>,
-    browsers: &[super::super::model::UIBrowser],
-) -> String {
+
+fn general_tab(ui: &UIState, st: &Style) -> El {
+    let visual = &ui.ui_settings.visual_settings;
+    let theme_index = match visual.theme {
+        ConfiguredTheme::Auto => 0,
+        ConfiguredTheme::Light => 1,
+        ConfiguredTheme::Dark => 2,
+    };
+    let theme = st.segmented(
+        "theme",
+        &["System", "Light", "Dark"],
+        theme_index,
+        |s: &mut SettingsUi, index| {
+            s.ui().ui_settings.visual_settings.theme = match index {
+                1 => ConfiguredTheme::Light,
+                2 => ConfiguredTheme::Dark,
+                _ => ConfiguredTheme::Auto,
+            };
+            s.save_visual_settings();
+        },
+    );
+
+    col()
+        .w_full()
+        .gap(6.0)
+        .child(st.setting_row(
+            "Appearance",
+            "Follow the system or choose a fixed theme",
+            theme,
+        ))
+        .child(st.setting_row(
+            "Keyboard hints",
+            "Show number shortcuts in the browser picker",
+            st.switch("show-hotkeys", visual.show_hotkeys, true)
+                .on_press(|s: &mut SettingsUi| {
+                    let visual = &mut s.ui().ui_settings.visual_settings;
+                    visual.show_hotkeys = !visual.show_hotkeys;
+                    s.save_visual_settings();
+                }),
+        ))
+        .child(st.setting_row(
+            "Close when focus is lost",
+            "Dismiss the picker after switching to another app",
+            st.switch("quit-on-blur", visual.quit_on_lost_focus, true)
+                .on_press(|s: &mut SettingsUi| {
+                    let visual = &mut s.ui().ui_settings.visual_settings;
+                    visual.quit_on_lost_focus = !visual.quit_on_lost_focus;
+                    s.save_visual_settings();
+                }),
+        ))
+        .child(st.setting_row(
+            "Unwrap tracking links",
+            "Open the destination behind Outlook Safe Links and Messenger redirects",
+            st.switch(
+                "unwrap-urls",
+                ui.ui_settings.behavioral_settings.unwrap_urls,
+                true,
+            )
+            .on_press(|s: &mut SettingsUi| {
+                let unwrap = !s.ui().ui_settings.behavioral_settings.unwrap_urls;
+                s.set_unwrap_urls(unwrap);
+            }),
+        ))
+}
+
+fn opener_label(opener: &Option<UIProfileAndIncognito>, browsers: &[UIBrowser]) -> String {
     opener
         .as_ref()
         .and_then(|opener| {
@@ -900,43 +433,295 @@ fn opener_label(
         })
         .unwrap_or_else(|| "Choose an opener".to_string())
 }
-fn opener_menu_item(profile: &UIBrowser) -> PopupMenuItem {
-    let label = profile.get_full_name();
-    let icon_path = profile.icon_path.clone();
-    let profile_icon_path = profile.profile_icon_path.clone();
 
-    PopupMenuItem::element(move |_, cx| {
-        let icon_path = icon_path.clone();
-        let profile_icon_path = profile_icon_path.clone();
-        h_flex()
+fn opener_menu(browsers: &[UIBrowser], with_ask: bool) -> PopupMenu {
+    let mut menu = PopupMenu::new();
+    if with_ask {
+        menu = menu.item(PopupItem::new("", "Ask every time")).separator();
+    }
+    for browser in browsers {
+        menu = menu.item(PopupItem::new(browser.unique_id.clone(), browser.get_full_name()));
+    }
+    menu
+}
+
+fn rules_tab(s: &SettingsUi, ui: &UIState, st: &Style) -> El {
+    let default_opener = &ui.ui_settings.default_opener;
+    let default_private = default_opener.as_ref().is_some_and(|opener| opener.incognito);
+
+    let fallback = row()
+        .w_full()
+        .padding(8.0)
+        .gap(12.0)
+        .radius(8.0)
+        .center_y()
+        .fill(st.t.card)
+        .child(
+            col()
+                .grow(1.0)
+                .gap(2.0)
+                .child(text("Fallback opener").font(type_::TITLE).color(st.t.text))
+                .child(text("Used when no rule matches").font(type_::LABEL).color(st.t.text_secondary)),
+        )
+        .child(
+            st.button("default-opener", opener_label(default_opener, &ui.browsers), false)
+                .on_press_tx(|s: &mut SettingsUi, tx: &mut Tx| {
+                    let menu = opener_menu(&s.ui().browsers.clone(), true);
+                    tx.popup_menu(menu, "default-opener", |s: &mut SettingsUi, picked, _| {
+                        let Some(picked) = picked else { return };
+                        let incognito = s
+                            .ui()
+                            .ui_settings
+                            .default_opener
+                            .as_ref()
+                            .is_some_and(|opener| opener.incognito);
+                        let opener = (!picked.is_empty()).then(|| UIProfileAndIncognito {
+                            profile: picked.to_string(),
+                            incognito,
+                        });
+                        s.set_default_opener(opener);
+                    });
+                }),
+        )
+        .child(text("Private").font(type_::LABEL).color(st.t.text_secondary))
+        .child(
+            st.switch("default-private", default_private, default_opener.is_some())
+                .on_press(|s: &mut SettingsUi| {
+                    if let Some(mut opener) = s.ui().ui_settings.default_opener.clone() {
+                        opener.incognito = !opener.incognito;
+                        s.set_default_opener(Some(opener));
+                    }
+                }),
+        );
+
+    let header = row()
+        .w_full()
+        .gap(8.0)
+        .center_y()
+        .child(text("Opening rules").font(type_::TITLE).color(st.t.text))
+        .child(text(format!("{} · First match wins", s.rules.len())).font(type_::LABEL).color(st.t.text_secondary))
+        .child(spacer())
+        .child(st.button("add-rule", "Add rule", false).on_press(|s: &mut SettingsUi| {
+            s.rules.push(RuleEditor {
+                source_app: TextEdit::new(""),
+                url_pattern: TextEdit::new(""),
+                opener: None,
+            });
+        }))
+        .child(st.button("save-rules", "Save changes", true).on_press(|s: &mut SettingsUi| s.save_rules()));
+
+    let mut list = col().key("rules").w_full().gap(8.0).scroll(ScrollSpec { stick_bottom: false });
+    if s.rules.is_empty() {
+        list = list.child(
+            col()
+                .w_full()
+                .padding(24.0)
+                .gap(4.0)
+                .center()
+                .radius(8.0)
+                .border(1.0, st.t.separator)
+                .child(text("No opening rules").font(type_::TITLE).color(st.t.text_secondary))
+                .child(text("Add one to route matching links automatically").font(type_::LABEL).color(st.t.text_secondary)),
+        );
+    }
+    for (index, rule) in s.rules.iter().enumerate() {
+        list = list.child(rule_card(index, rule, ui, st));
+    }
+
+    col()
+        .w_full()
+        .h_full()
+        .gap(12.0)
+        .child(fallback)
+        .child(header)
+        .child(col().w_full().grow(1.0).min_h(0.0).child(list))
+}
+
+fn rule_card(index: usize, rule: &RuleEditor, ui: &UIState, st: &Style) -> El {
+    let field = |edit: &TextEdit, key: String, placeholder: &str| {
+        // A line as tall as the field centres the value and the placeholder in it.
+        text_input(edit, type_::BODY.lh(26.0))
+            .key(key)
+            .single_line()
+            .placeholder_font(type_::BODY.lh(26.0))
+            .px(8.0)
+            .radius(6.0)
+            .fill(st.t.control_track)
+            .border(1.0, st.t.separator)
+            .color(st.t.text)
+            .placeholder(placeholder, st.t.text_secondary)
+    };
+    let source = field(&rule.source_app, format!("rule-{index}-source"), "Source application (optional)")
+        .w(220.0)
+        .on_edit(move |s: &mut SettingsUi| &mut s.rules[index].source_app);
+    let pattern = field(&rule.url_pattern, format!("rule-{index}-pattern"), "URL pattern, e.g. example.com/**")
+        .grow(1.0)
+        .on_edit(move |s: &mut SettingsUi| &mut s.rules[index].url_pattern);
+
+    let opener_key = format!("rule-{index}-opener");
+    let private = rule.opener.as_ref().is_some_and(|opener| opener.incognito);
+    let badge = |label: &str, fill: Color| {
+        row()
+            .w(48.0)
+            .h(24.0)
+            .radius(5.0)
+            .center()
+            .fill(fill)
+            .child(text(label).font(type_::SECTION).color(Color::WHITE))
+    };
+
+    col()
+        .key(format!("rule-{index}"))
+        .w_full()
+        .padding(8.0)
+        .gap(8.0)
+        .radius(8.0)
+        .fill(st.t.card)
+        .child(
+            row()
+                .w_full()
+                .center_y()
+                .child(text(format!("RULE {:02}", index + 1)).font(type_::SECTION).color(st.t.text_secondary))
+                .child(spacer())
+                .child(
+                    st.button(format!("rule-{index}-delete"), "Delete", false)
+                        .on_press(move |s: &mut SettingsUi| {
+                            if index < s.rules.len() {
+                                s.rules.remove(index);
+                                s.save_rules();
+                            }
+                        }),
+                ),
+        )
+        .child(
+            row()
+                .w_full()
+                .gap(8.0)
+                .center_y()
+                .child(badge("WHEN", st.t.indicator))
+                .child(source)
+                .child(text("AND").font(type_::LABEL).color(st.t.text_secondary))
+                .child(pattern),
+        )
+        .child(
+            row()
+                .w_full()
+                .gap(8.0)
+                .center_y()
+                .child(badge("THEN", st.accent))
+                .child(
+                    st.button(opener_key.clone(), opener_label(&rule.opener, &ui.browsers), false)
+                        .on_press_tx(move |s: &mut SettingsUi, tx: &mut Tx| {
+                            let menu = opener_menu(&s.ui().browsers.clone(), false);
+                            tx.popup_menu(menu, opener_key.as_str(), move |s: &mut SettingsUi, picked, _| {
+                                let (Some(picked), Some(rule)) = (picked, s.rules.get_mut(index)) else {
+                                    return;
+                                };
+                                let incognito = rule.opener.as_ref().is_some_and(|opener| opener.incognito);
+                                rule.opener = Some(UIProfileAndIncognito {
+                                    profile: picked.to_string(),
+                                    incognito,
+                                });
+                            });
+                        }),
+                )
+                .child(text("Private").font(type_::LABEL).color(st.t.text_secondary))
+                .child(
+                    st.switch(format!("rule-{index}-private"), private, rule.opener.is_some())
+                        .on_press(move |s: &mut SettingsUi| {
+                            if let Some(opener) = s.rules.get_mut(index).and_then(|rule| rule.opener.as_mut()) {
+                                opener.incognito = !opener.incognito;
+                            }
+                        }),
+                ),
+        )
+}
+
+fn advanced_tab(ui: &UIState, st: &Style) -> El {
+    let mut content = col()
+        .w_full()
+        .gap(6.0)
+        .child(st.setting_row(
+            "Default browser",
+            "Register Browsers as the system handler for web links",
+            st.button("make-default", "Make default", true).on_press(|s: &mut SettingsUi| {
+                s.send(MessageToMain::SetBrowsersAsDefaultBrowser)
+            }),
+        ))
+        .child(st.setting_row(
+            "Installed applications",
+            "Rescan browser profiles and desktop URL handlers",
+            st.button("refresh-apps", "Refresh", false)
+                .on_press(|s: &mut SettingsUi| s.send(MessageToMain::Refresh)),
+        ));
+
+    if !ui.restorable_app_profiles.is_empty() {
+        let mut hidden = col()
             .w_full()
-            .gap_2()
-            .child(
-                h_flex()
-                    .w(px(20.0))
-                    .h(px(18.0))
-                    .flex_none()
-                    .items_center()
-                    .when(icon_path.is_empty(), |this| {
-                        this.child(
-                            Icon::new(IconName::Globe)
-                                .small()
-                                .text_color(cx.theme().muted_foreground),
-                        )
-                    })
-                    .when(!icon_path.is_empty(), |this| {
-                        this.child(img(PathBuf::from(icon_path)).size_4().flex_none())
-                    })
-                    .when(!profile_icon_path.is_empty(), |this| {
-                        this.child(
-                            img(PathBuf::from(profile_icon_path))
-                                .size_2()
-                                .ml(px(-4.0))
-                                .mt(px(9.0))
-                                .flex_none(),
-                        )
-                    }),
-            )
-            .child(gpui::div().min_w_0().flex_1().child(label.clone()))
-    })
+            .gap(4.0)
+            .child(text("Hidden profiles").font(type_::TITLE).color(st.t.text));
+        for profile in ui.restorable_app_profiles.iter() {
+            let id = profile.unique_id.clone();
+            hidden = hidden.child(
+                row()
+                    .w_full()
+                    .py(2.0)
+                    .center_y()
+                    .child(text(profile.get_full_name()).font(type_::BODY).color(st.t.text).grow(1.0))
+                    .child(
+                        st.button(format!("restore-{id}"), "Restore", false)
+                            .on_press(move |s: &mut SettingsUi| {
+                                s.send(MessageToMain::RestoreAppProfile(id.clone()))
+                            }),
+                    ),
+            );
+        }
+        content = content.child(hidden);
+    }
+
+    let path_line = |label: &str, path: std::path::PathBuf| {
+        text(format!("{label}: {}", path.display()))
+            .font(type_::LABEL)
+            .color(st.t.text_secondary)
+            .selectable(true)
+    };
+    content
+        .child(el().h(1.0).w_full().fill(st.t.separator))
+        .child(path_line("Configuration", paths::get_config_json_path()))
+        .child(path_line("Cache", paths::get_cache_root_dir()))
+        .child(path_line("Logs", paths::get_logs_root_dir()))
+}
+
+struct About {
+    open: Arc<AtomicBool>,
+    persistent: bool,
+}
+
+fn about_view(_: &About, cx: &mut Cx<About>) -> El {
+    let st = Style::new(ConfiguredTheme::Auto, cx);
+    col()
+        .w_full()
+        .h_full()
+        .padding(16.0)
+        .gap(8.0)
+        .center()
+        .fill(st.t.bg)
+        .child(text("Browsers").font(TextStyle::new(22.0, 600.0)).color(st.t.text))
+        .child(
+            text(format!("Version {}", env!("CARGO_PKG_VERSION")))
+                .font(type_::LABEL)
+                .color(st.t.text_secondary),
+        )
+        .child(text("Open the right browser at the right time.").font(type_::BODY).color(st.t.text))
+        .child(
+            row()
+                .gap(8.0)
+                .mt(8.0)
+                .child(st.button("source", "Source code", false).on_press_tx(|_: &mut About, tx: &mut Tx| {
+                    tx.open_url(SOURCE_URL).ok();
+                }))
+                .child(st.button("close", "Close", true).on_press_tx(|_: &mut About, tx: &mut Tx| {
+                    tx.close_window()
+                })),
+        )
 }
