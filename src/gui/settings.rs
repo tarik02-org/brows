@@ -525,10 +525,10 @@ fn rules_tab(s: &SettingsUi, ui: &UIState, k: &Kit, layer: &mut Vec<El>) -> El {
         );
 
     let mut list = col()
-        .key("rules")
         .w_full()
         .grow(1.0)
         .min_h(0.0)
+        .pr(12.0)
         .gap(8.0)
         .scroll(ScrollSpec {
             stick_bottom: false,
@@ -565,7 +565,12 @@ fn rules_tab(s: &SettingsUi, ui: &UIState, k: &Kit, layer: &mut Vec<El>) -> El {
         .gap(12.0)
         .child(fallback)
         .child(header)
-        .child(list)
+        .child(
+            rune_kit::scroll_bar(k, "rules-area", "rules", list)
+                .w_full()
+                .grow(1.0)
+                .min_h(0.0),
+        )
 }
 
 fn rule_card(
