@@ -3,8 +3,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 
 use rune::{
-    App, AppHandle, AppSpec, Cx, El, Key, KeyEvent, ScrollSpec, TextEdit, Tx, WindowHandle,
-    WindowOptions, WindowSpec, col, el, row, spacer, text,
+    App, AppHandle, AppSpec, Cx, El, Key, KeyEvent, ScrollSpec, TextEdit, Titlebar, Tx,
+    WindowHandle, WindowOptions, WindowSpec, col, el, row, spacer, text,
 };
 use rune_kit::{
     Button, ButtonVariant, ControlSize, Kit, SegmentedControl, Select, Switch, TextInput,
@@ -22,6 +22,7 @@ const SETTINGS_SIZE: (f32, f32) = (680.0, 500.0);
 const ABOUT_SIZE: (f32, f32) = (380.0, 280.0);
 const SOURCE_URL: &str = "https://github.com/tarik02-org/brows";
 const ASK_EVERY_TIME: &str = "Ask every time";
+const TITLEBAR_HEIGHT: f32 = 48.0;
 
 /// The Settings and About windows, created hidden with the picker and shown on request.
 pub(super) struct AuxWindows {
@@ -61,6 +62,7 @@ impl AuxWindows {
             on_key: Some(close_on_escape),
             ..AppSpec::new("brows Settings", SETTINGS_SIZE, || unreachable!(), settings_view)
         })
+        .titlebar(Titlebar::new(TITLEBAR_HEIGHT))
         .init(move || settings_state)
         .on_close(|s, tx| {
             s.open.store(false, Ordering::Relaxed);
@@ -82,6 +84,7 @@ impl AuxWindows {
             on_key: Some(close_on_escape),
             ..AppSpec::new("About brows", ABOUT_SIZE, || unreachable!(), about_view)
         })
+        .titlebar(Titlebar::new(TITLEBAR_HEIGHT))
         .init(move || about_state)
         .on_close(|s, tx| {
             s.open.store(false, Ordering::Relaxed);
@@ -288,7 +291,9 @@ fn settings_view(s: &SettingsUi, cx: &mut Cx<SettingsUi>) -> El {
     let tabs = SegmentedControl::new(&["General", "Rules", "Advanced"], Some(tab_index))
         .label("Settings section")
         .fit()
-        .on_pick(|s: &mut SettingsUi, index, _: &mut Tx| {
+        .on_pick(|s: &mut SettingsUi, index, tx: &mut Tx| {
+            // Sections swap whole; animating one into the other reads as a glitch.
+            tx.instant();
             s.open_select = None;
             s.ui().ui_settings.tab = match index {
                 1 => SettingsTab::Rules,
@@ -305,11 +310,22 @@ fn settings_view(s: &SettingsUi, cx: &mut Cx<SettingsUi>) -> El {
         SettingsTab::Advanced => advanced_tab(ui, &k),
     };
 
+    let insets = cx.chrome_insets();
+    let titlebar = row()
+        .key("titlebar")
+        .h(TITLEBAR_HEIGHT)
+        .w_full()
+        .pl(12.0 + insets.leading)
+        .pr(12.0 + insets.trailing)
+        .center_y()
+        .window_drag()
+        .child(tabs);
+
     let body = col()
         .w_full()
         .h_full()
         .fill(k.c.bg_base)
-        .child(row().h(48.0).w_full().px(12.0).center_y().child(tabs))
+        .child(titlebar)
         .child(el().h(1.0).w_full().fill(k.c.border_muted))
         .child(
             col()
@@ -508,9 +524,15 @@ fn rules_tab(s: &SettingsUi, ui: &UIState, k: &Kit, layer: &mut Vec<El>) -> El {
                 .key("save-rules"),
         );
 
-    let mut list = col().key("rules").w_full().gap(8.0).scroll(ScrollSpec {
-        stick_bottom: false,
-    });
+    let mut list = col()
+        .key("rules")
+        .w_full()
+        .grow(1.0)
+        .min_h(0.0)
+        .gap(8.0)
+        .scroll(ScrollSpec {
+            stick_bottom: false,
+        });
     if s.rules.is_empty() {
         list = list.child(
             col()
@@ -538,11 +560,12 @@ fn rules_tab(s: &SettingsUi, ui: &UIState, k: &Kit, layer: &mut Vec<El>) -> El {
 
     col()
         .w_full()
-        .h_full()
+        .grow(1.0)
+        .min_h(0.0)
         .gap(12.0)
         .child(fallback)
         .child(header)
-        .child(col().w_full().grow(1.0).min_h(0.0).child(list))
+        .child(list)
 }
 
 fn rule_card(
@@ -740,13 +763,18 @@ struct About {
 
 fn about_view(s: &About, cx: &mut Cx<About>) -> El {
     let k = style::kit(s.theme, cx);
-    col()
+    let titlebar = el()
+        .key("titlebar")
+        .h(TITLEBAR_HEIGHT)
         .w_full()
-        .h_full()
+        .window_drag();
+    let content = col()
+        .w_full()
+        .grow(1.0)
+        .min_h(0.0)
         .padding(16.0)
         .gap(8.0)
         .center()
-        .fill(k.c.bg_base)
         .child(
             text("brows")
                 .font(rune::TextStyle::new(22.0, 600.0))
@@ -786,5 +814,11 @@ fn about_view(s: &About, cx: &mut Cx<About>) -> El {
                         .build(&k)
                         .key("close"),
                 ),
-        )
+        );
+    col()
+        .w_full()
+        .h_full()
+        .fill(k.c.bg_base)
+        .child(titlebar)
+        .child(content)
 }

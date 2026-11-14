@@ -4,7 +4,7 @@ use std::sync::mpsc::Sender;
 
 use rune::{
     AppHandle, Color, Cx, El, Image, ImageCache, Key, KeyEvent, Mods, PhysicalKeyCode,
-    PointerPress, PopupItem, PopupMenu, Tx, Waker, col, el, popup_menu_supported, row, text,
+    PointerPress, Tx, Waker, col, el, row, text,
 };
 use rune_kit::{Button, ButtonVariant, ControlSize, Keybind, Kit, Menu, MenuItem, context_menu};
 use tracing::{info, warn};
@@ -42,13 +42,11 @@ enum MenuKind {
     Browser(usize),
 }
 
-/// A menu being shown, natively or (where the platform has no native pop-up menus) in the
-/// picker window itself.
+/// A menu drawn inside the picker window, which grows while it's open so the menu fits.
 #[derive(Clone, Copy)]
 struct OpenMenu {
     kind: MenuKind,
     at: Option<PointerPress>,
-    in_window: bool,
 }
 
 enum MenuLine {
@@ -215,9 +213,7 @@ impl Picker {
     }
 
     pub(super) fn on_focus(&mut self, focused: bool, tx: &mut Tx) {
-        let native_menu_open = self.menu.is_some_and(|menu| !menu.in_window);
         if !focused
-            && !native_menu_open
             && !self.aux.any_open()
             && self.state.ui_settings.visual_settings.quit_on_lost_focus
         {
@@ -361,50 +357,15 @@ impl Picker {
         }
     }
 
-    /// Opens a native menu where the platform has one (Windows, macOS); elsewhere the view
-    /// draws the menu inside the picker window.
-    fn open_menu(&mut self, kind: MenuKind, at: Option<PointerPress>, tx: &mut Tx) {
-        if !popup_menu_supported() {
-            self.menu = Some(OpenMenu {
-                kind,
-                at,
-                in_window: true,
-            });
-            return;
-        }
-
-        let mut menu = PopupMenu::new();
-        for line in self.menu_lines(kind) {
-            menu = match line {
-                MenuLine::Item { id, label, enabled } => {
-                    menu.item(PopupItem::new(id, label).enabled(enabled))
-                }
-                MenuLine::Separator => menu.separator(),
-                MenuLine::Label(label) => menu.item(PopupItem::new("", label).enabled(false)),
-            };
-        }
-        self.menu = Some(OpenMenu {
-            kind,
-            at,
-            in_window: false,
-        });
-        let on_pick = move |s: &mut Picker, picked: Option<&str>, tx: &mut Tx| {
-            s.menu = None;
-            if let Some(id) = picked.filter(|id| !id.is_empty()) {
-                s.pick(kind, id, tx);
-            }
-        };
-        match at {
-            Some(press) => tx.popup_menu(menu, press, on_pick),
-            None => tx.popup_menu(menu, "options", on_pick),
-        }
+    fn open_menu(&mut self, kind: MenuKind, at: Option<PointerPress>) {
+        self.menu = Some(OpenMenu { kind, at });
     }
 
-    fn in_window_menu(&self, kind: MenuKind) -> Option<OpenMenu> {
-        self.menu.filter(|menu| menu.in_window && menu.kind == kind)
+    fn open_menu_of(&self, kind: MenuKind) -> Option<OpenMenu> {
+        self.menu.filter(|menu| menu.kind == kind)
     }
 
-    /// The in-window menu's entries; selecting one runs the same action as the native menu.
+    /// The menu's entries; selecting one runs its action.
     fn kit_menu(&self, menu: Menu, kind: MenuKind) -> Menu {
         let mut menu = menu
             .min_width(MENU_WIDTH)
@@ -425,7 +386,7 @@ impl Picker {
 
     /// Extra transparent room under the panel so an in-window menu fits in the window.
     fn menu_room(&self) -> f32 {
-        let Some(menu) = self.menu.filter(|menu| menu.in_window) else {
+        let Some(menu) = self.menu else {
             return 0.0;
         };
         let menu_height: f32 = self
@@ -474,7 +435,7 @@ pub(super) fn view(s: &Picker, cx: &mut Cx<Picker>) -> El {
     let mut list = col().key("browsers").w_full();
     for (index, browser) in s.state.filtered_browsers.iter().enumerate() {
         let browser_row = browser_row(s, index, browser, &k);
-        list = list.child(match s.in_window_menu(MenuKind::Browser(index)) {
+        list = list.child(match s.open_menu_of(MenuKind::Browser(index)) {
             Some(open) => s
                 .kit_menu(
                     context_menu(format!("browser-menu-{index}"), browser_row, open.at),
@@ -496,10 +457,10 @@ pub(super) fn view(s: &Picker, cx: &mut Cx<Picker>) -> El {
     let options = Button::new("•••")
         .variant(ButtonVariant::Ghost)
         .control_size(ControlSize::Regular)
-        .on_press_tx(|s: &mut Picker, tx: &mut Tx| s.open_menu(MenuKind::Options, None, tx))
+        .on_press(|s: &mut Picker| s.open_menu(MenuKind::Options, None))
         .build(&k)
         .key("options");
-    let options = match s.in_window_menu(MenuKind::Options) {
+    let options = match s.open_menu_of(MenuKind::Options) {
         Some(_) => s
             .kit_menu(
                 Menu::new("options-menu").trigger(options).open(true),
@@ -580,8 +541,8 @@ fn browser_row(s: &Picker, index: usize, browser: &UIBrowser, k: &Kit) -> El {
                 s.state.focused_index = Some(index);
             }
         })
-        .on_secondary_press(move |s: &mut Picker, press, tx: &mut Tx| {
-            s.open_menu(MenuKind::Browser(index), Some(press), tx)
+        .on_secondary_press(move |s: &mut Picker, press, _: &mut Tx| {
+            s.open_menu(MenuKind::Browser(index), Some(press))
         })
         .child(browser_icon(s, browser, k))
         .child(label);

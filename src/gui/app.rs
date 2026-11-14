@@ -11,6 +11,8 @@ use super::settings::AuxWindows;
 use crate::utils::BehavioralConfig;
 use crate::{MessageToMain, MessageToUi};
 
+const APP_ID: &str = "me.tarik02.brows";
+
 /// Run the UI on the current thread. A persistent (daemon) app starts hidden and shows the
 /// picker for every URL the backend forwards; otherwise the picker shows once and quits.
 pub fn run(
@@ -28,6 +30,12 @@ pub fn run(
         on_key: Some(Picker::on_key),
         ..AppSpec::new("brows", size, || unreachable!(), picker::view)
     };
+    // Linux matches the app id to brows' .desktop entry for its icon; Windows takes the
+    // executable's own icon (winres embeds it as resource 1) for every window.
+    rune::set_app_id(APP_ID);
+    #[cfg(target_os = "windows")]
+    rune::set_app_icon_resource(1);
+
     let mut app = App::new(spec)
         .fit_content_height()
         .on_focus(Picker::on_focus)
