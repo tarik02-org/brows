@@ -6,6 +6,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Releases use `Y.M.DN` calendar versions, where `N` is the zero-based release
 number for that day.
 
+## [2026.11.2800](https://github.com/tarik02-org/brows/compare/brows-2026.8.1400...brows-2026.11.2800) (2026-11-28)
+
+
+### Features
+
+* switch to rune and rebrand as brows ([#31](https://github.com/tarik02-org/brows/issues/31)) ([1d94c0a](https://github.com/tarik02-org/brows/commit/1d94c0a927f234bdc3937c7ee9f39c32e0d56ae2))
+
+
+### Bug Fixes
+
+* apply opening rules before showing macOS picker ([#29](https://github.com/tarik02-org/brows/issues/29)) ([d8be078](https://github.com/tarik02-org/brows/commit/d8be078f9ef5edea1de933a853beafea6254aa99))
+* **ci:** use calver for release pull requests ([#15](https://github.com/tarik02-org/brows/issues/15)) ([24d6456](https://github.com/tarik02-org/brows/commit/24d6456fcdaae38172c7f6bff90958b249b98fdb))
+* keep macOS picker nonactivating ([#20](https://github.com/tarik02-org/brows/issues/20)) ([76ead3d](https://github.com/tarik02-org/brows/commit/76ead3d7d692c3ce7d52d6ef804f092ff71210a3))
+* keep macOS picker warm ([#17](https://github.com/tarik02-org/brows/issues/17)) ([352543f](https://github.com/tarik02-org/brows/commit/352543f1589809c55bb6f53dd04a2bfb7b47e422))
+* position macOS picker at cursor ([#16](https://github.com/tarik02-org/brows/issues/16)) ([2aef9a2](https://github.com/tarik02-org/brows/commit/2aef9a2fb48268f22292c5102e0fe2615517919e))
+* prevent daemon picker stalls ([#28](https://github.com/tarik02-org/brows/issues/28)) ([b29acfb](https://github.com/tarik02-org/brows/commit/b29acfb6fee737f3247112c541b0834f412f08ac))
+
+
+### Code Refactoring
+
+* split gui modules ([#21](https://github.com/tarik02-org/brows/issues/21)) ([ff8e87f](https://github.com/tarik02-org/brows/commit/ff8e87fc46d8ab814755ad87209c8ca2a81b11b0))
+
+
+### Documentation
+
+* document PR title style ([#18](https://github.com/tarik02-org/brows/issues/18)) ([4150b39](https://github.com/tarik02-org/brows/commit/4150b3921f8d5f840b23a9796ca13b49fdc1f15b))
+
+
+### Build System
+
+* automate calendar releases ([#11](https://github.com/tarik02-org/brows/issues/11)) ([79ac914](https://github.com/tarik02-org/brows/commit/79ac914fc233a1d2199871b27c5d8d6e56820c84))
+* move packaging to cargo xtask ([#14](https://github.com/tarik02-org/brows/issues/14)) ([e992212](https://github.com/tarik02-org/brows/commit/e992212bee1a26734ae94a32eaf9a3c5c440fbe3))
+
+
+### Continuous Integration
+
+* add nightly releases ([#27](https://github.com/tarik02-org/brows/issues/27)) ([45d695b](https://github.com/tarik02-org/brows/commit/45d695bad8570722106462485b73f20b1f36d961))
+* speed up cross-platform builds ([#12](https://github.com/tarik02-org/brows/issues/12)) ([afebb94](https://github.com/tarik02-org/brows/commit/afebb94490dae072f3428a035b3cd73693479caf))
+
+
+### Miscellaneous Chores
+
+* release 2026.8.1400 ([#13](https://github.com/tarik02-org/brows/issues/13)) ([d923972](https://github.com/tarik02-org/brows/commit/d923972f202263ebf826a3d17750736ce3cfd1ea))
+
 ## 2026.8.1400 (2026-08-14)
 
 
